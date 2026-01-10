@@ -5,10 +5,58 @@
 ## Order: 4 (no dependencies)
 ## Source: game-architecture.md#Event System
 ##
-## Naming Convention: {noun}_{past_tense_verb}
-## Usage: EventBus.animal_selected.emit(animal)
-##        EventBus.animal_selected.connect(_on_animal_selected)
-class_name EventBus
+## =============================================================================
+## NAMING CONVENTION
+## =============================================================================
+## Pattern: {noun}_{past_tense_verb}
+## Examples: animal_selected, resource_changed, combat_ended, milestone_reached
+##
+## =============================================================================
+## USAGE EXAMPLES
+## =============================================================================
+##
+## EMITTING A SIGNAL (from any system):
+##   EventBus.resource_changed.emit("wood", new_wood_count)
+##   EventBus.animal_selected.emit(animal_node)
+##   EventBus.combat_ended.emit(true, ["rabbit", "fox"])
+##
+## CONNECTING TO A SIGNAL (in _ready):
+##   func _ready() -> void:
+##       EventBus.resource_changed.connect(_on_resource_changed)
+##
+##   func _on_resource_changed(resource_type: String, amount: int) -> void:
+##       if resource_type == "wood":
+##           wood_label.text = str(amount)
+##
+## SAFE DISCONNECTION (in _exit_tree):
+##   func _exit_tree() -> void:
+##       if EventBus.resource_changed.is_connected(_on_resource_changed):
+##           EventBus.resource_changed.disconnect(_on_resource_changed)
+##
+## ONE-SHOT CONNECTION (fires once then auto-disconnects):
+##   EventBus.milestone_reached.connect(_on_first_milestone, CONNECT_ONE_SHOT)
+##
+## =============================================================================
+## WHEN TO USE EVENTBUS vs DIRECT SIGNALS
+## =============================================================================
+##
+## USE EVENTBUS for:
+##   - System-to-system communication (e.g., Combat → UI, Resources → Save)
+##   - Global state changes (pause, save, milestone)
+##   - Decoupled observers (UI listening to game events)
+##   - Broadcasting to unknown listeners
+##
+## USE DIRECT SIGNALS for:
+##   - Parent-child communication within same entity
+##   - Component-to-component within same scene
+##   - Tight coupling is intentional and appropriate
+##   - Performance-critical inner loops
+##
+## ARCHITECTURE RULE (AR5):
+##   EventBus is the ONLY approved mechanism for system-to-system communication.
+##   Direct imports between systems (e.g., Combat importing Production) are PROHIBITED.
+##
+## =============================================================================
 extends Node
 
 # =============================================================================
