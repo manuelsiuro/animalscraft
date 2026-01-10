@@ -1,0 +1,39 @@
+# Godot 4.x
+.godot/
+*.translation
+
+# Export builds
+export/*.apk
+export/*.aab
+export/*.zip
+export/*.exe
+export/*.dmg
+export/*.app
+export/android/*.keystore
+
+# Import cache (generated at runtime)
+.import/
+*.import
+
+# Mono/C# (if used in future)
+.mono/
+data_*/
+mono_crash.*.json
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE specific
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Local export presets (may contain sensitive paths)
+# Comment this out if you want to track export presets
+# export_presets.cfg
