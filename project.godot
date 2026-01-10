@@ -17,6 +17,17 @@ run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.5", "Mobile")
 config/icon="res://icon.svg"
 
+[autoload]
+
+GameConstants="*res://autoloads/game_constants.gd"
+Logger="*res://autoloads/logger.gd"
+ErrorHandler="*res://autoloads/error_handler.gd"
+EventBus="*res://autoloads/event_bus.gd"
+Settings="*res://autoloads/settings.gd"
+AudioManager="*res://autoloads/audio_manager.gd"
+SaveManager="*res://autoloads/save_manager.gd"
+GameManager="*res://autoloads/game_manager.gd"
+
 [display]
 
 window/size/viewport_width=1080

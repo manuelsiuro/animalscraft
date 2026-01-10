@@ -1,0 +1,320 @@
+## Core game state manager for AnimalsCraft.
+## Autoload singleton - access via GameManager
+##
+## Architecture: autoloads/game_manager.gd
+## Order: 8 (depends on all other autoloads)
+## Source: game-architecture.md#State Management
+##
+## Controls game state, pause, time scale, and coordinates other systems.
+class_name GameManager
+extends Node
+
+# =============================================================================
+# GAME STATE
+# =============================================================================
+
+## Game state machine states
+enum GameState {
+	INITIALIZING,  ## Game is starting up
+	MENU,          ## In main menu
+	LOADING,       ## Loading a save or new game
+	PLAYING,       ## Normal gameplay
+	PAUSED,        ## Game is paused
+	CUTSCENE,      ## Playing a cutscene
+}
+
+## Current game state
+var _state: GameState = GameState.INITIALIZING
+
+## Previous state (for returning from pause)
+var _previous_state: GameState = GameState.INITIALIZING
+
+# =============================================================================
+# TIME TRACKING
+# =============================================================================
+
+## Total playtime in seconds (current session)
+var _session_playtime: float = 0.0
+
+## Playtime loaded from save
+var _loaded_playtime: float = 0.0
+
+## Game time scale (1.0 = normal)
+var _time_scale: float = 1.0
+
+## Paused time scale (stored during pause)
+var _pre_pause_time_scale: float = 1.0
+
+# =============================================================================
+# LIFECYCLE
+# =============================================================================
+
+func _ready() -> void:
+	# Set process mode to always run (even when paused)
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+	# Connect to error handler for recovery
+	if is_instance_valid(ErrorHandler):
+		ErrorHandler.critical_error.connect(_on_critical_error)
+
+	# Transition to menu state
+	_transition_to_state(GameState.MENU)
+
+	Logger.info("GameManager", "Game manager initialized")
+
+
+func _process(delta: float) -> void:
+	# Only track time while playing
+	if _state == GameState.PLAYING:
+		_session_playtime += delta
+
+
+func _notification(what: int) -> void:
+	match what:
+		NOTIFICATION_APPLICATION_FOCUS_OUT:
+			# Pause when app loses focus (mobile)
+			if _state == GameState.PLAYING:
+				pause_game()
+		NOTIFICATION_APPLICATION_FOCUS_IN:
+			# Don't auto-resume - let player choose
+			pass
+		NOTIFICATION_WM_CLOSE_REQUEST:
+			# Cleanup before quitting
+			EventBus.game_quitting.emit()
+
+
+# =============================================================================
+# STATE ACCESSORS
+# =============================================================================
+
+## Get the current game state.
+func get_state() -> GameState:
+	return _state
+
+
+## Check if game is currently playing.
+func is_playing() -> bool:
+	return _state == GameState.PLAYING
+
+
+## Check if game is paused.
+func is_paused() -> bool:
+	return _state == GameState.PAUSED
+
+
+## Check if game is in menu.
+func is_in_menu() -> bool:
+	return _state == GameState.MENU
+
+
+## Check if game is loading.
+func is_loading() -> bool:
+	return _state == GameState.LOADING
+
+
+# =============================================================================
+# STATE TRANSITIONS
+# =============================================================================
+
+## Start a new game.
+func start_new_game() -> void:
+	Logger.info("GameManager", "Starting new game")
+
+	_transition_to_state(GameState.LOADING)
+
+	# Reset playtime
+	_session_playtime = 0.0
+	_loaded_playtime = 0.0
+
+	# Initialize game world (to be implemented with world systems)
+	# For now, just transition to playing
+	await get_tree().create_timer(0.5).timeout  # Simulate loading
+
+	_transition_to_state(GameState.PLAYING)
+	EventBus.new_game_started.emit()
+
+
+## Load a saved game.
+## @param slot The save slot to load
+func load_saved_game(slot: int = 0) -> void:
+	Logger.info("GameManager", "Loading saved game from slot %d" % slot)
+
+	_transition_to_state(GameState.LOADING)
+
+	var success := SaveManager.load_game(slot)
+
+	if success:
+		_transition_to_state(GameState.PLAYING)
+	else:
+		# Return to menu on failed load
+		Logger.error("GameManager", "Failed to load game, returning to menu")
+		_transition_to_state(GameState.MENU)
+
+
+## Continue the most recent save.
+func continue_game() -> void:
+	var saves := SaveManager.get_all_save_info()
+	if saves.is_empty():
+		Logger.warn("GameManager", "No saves found to continue")
+		return
+
+	# Find most recent save
+	var most_recent: Dictionary = saves[0]
+	for save_info in saves:
+		if save_info.get("timestamp", "") > most_recent.get("timestamp", ""):
+			most_recent = save_info
+
+	load_saved_game(most_recent.get("slot", 0))
+
+
+## Pause the game.
+func pause_game() -> void:
+	if _state != GameState.PLAYING:
+		return
+
+	Logger.info("GameManager", "Game paused")
+
+	_previous_state = _state
+	_pre_pause_time_scale = _time_scale
+
+	_transition_to_state(GameState.PAUSED)
+
+	# Pause the scene tree
+	get_tree().paused = true
+
+	EventBus.game_paused.emit()
+
+
+## Resume the game from pause.
+func resume_game() -> void:
+	if _state != GameState.PAUSED:
+		return
+
+	Logger.info("GameManager", "Game resumed")
+
+	# Restore time scale
+	_time_scale = _pre_pause_time_scale
+
+	# Unpause the scene tree
+	get_tree().paused = false
+
+	_transition_to_state(GameState.PLAYING)
+
+	EventBus.game_resumed.emit()
+
+
+## Toggle pause state.
+func toggle_pause() -> void:
+	if _state == GameState.PLAYING:
+		pause_game()
+	elif _state == GameState.PAUSED:
+		resume_game()
+
+
+## Return to main menu.
+func return_to_menu() -> void:
+	Logger.info("GameManager", "Returning to main menu")
+
+	# Unpause if paused
+	if _state == GameState.PAUSED:
+		get_tree().paused = false
+
+	# Save before returning (if playing or paused)
+	if _state == GameState.PLAYING or _state == GameState.PAUSED:
+		SaveManager.quick_save()
+
+	_transition_to_state(GameState.MENU)
+
+	# Change to main menu scene
+	# get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+
+## Quit the game.
+func quit_game() -> void:
+	Logger.info("GameManager", "Quitting game")
+
+	EventBus.game_quitting.emit()
+
+	# Save before quitting
+	SaveManager.quick_save()
+
+	get_tree().quit()
+
+
+# =============================================================================
+# TIME CONTROL
+# =============================================================================
+
+## Get the current time scale.
+func get_time_scale() -> float:
+	return _time_scale
+
+
+## Set the game time scale.
+## @param scale Time scale (1.0 = normal, 2.0 = double speed, etc.)
+func set_time_scale(scale: float) -> void:
+	_time_scale = clampf(scale, 0.0, 4.0)
+	Engine.time_scale = _time_scale
+	Logger.debug("GameManager", "Time scale set to %.2f" % _time_scale)
+
+
+## Get total playtime in seconds.
+func get_playtime_seconds() -> float:
+	return _loaded_playtime + _session_playtime
+
+
+## Get formatted playtime string (HH:MM:SS).
+func get_playtime_formatted() -> String:
+	var total := int(get_playtime_seconds())
+	var hours := total / 3600
+	var minutes := (total % 3600) / 60
+	var seconds := total % 60
+	return "%02d:%02d:%02d" % [hours, minutes, seconds]
+
+
+# =============================================================================
+# ERROR RECOVERY
+# =============================================================================
+
+## Reset game to a safe state after critical error.
+## Called by ErrorHandler during recovery.
+func reset_to_safe_state() -> void:
+	Logger.warn("GameManager", "Resetting to safe state")
+
+	# Unpause if paused
+	if _state == GameState.PAUSED:
+		get_tree().paused = false
+
+	# Reset time scale
+	_time_scale = 1.0
+	Engine.time_scale = 1.0
+
+	# Return to menu as safest option
+	_transition_to_state(GameState.MENU)
+
+
+# =============================================================================
+# INTERNAL
+# =============================================================================
+
+## Transition to a new game state.
+func _transition_to_state(new_state: GameState) -> void:
+	if _state == new_state:
+		return
+
+	var old_state := _state
+	_state = new_state
+
+	Logger.info("GameManager", "State: %s -> %s" % [
+		GameState.keys()[old_state],
+		GameState.keys()[new_state]
+	])
+
+
+## Handle critical error from ErrorHandler.
+func _on_critical_error(system: String, message: String) -> void:
+	Logger.error("GameManager", "Critical error in %s: %s" % [system, message])
+
+	# Pause game during error handling
+	if _state == GameState.PLAYING:
+		pause_game()
