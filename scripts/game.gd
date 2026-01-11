@@ -30,7 +30,7 @@ extends Node
 
 
 ## References to core subsystem nodes
-@onready var world: Node2D = $World
+@onready var world: WorldManager = $World
 @onready var ui: CanvasLayer = $UI
 @onready var camera: Camera2D = $Camera
 
@@ -62,7 +62,7 @@ func _ready() -> void:
 	# Mark as initialized
 	_initialized = true
 
-	# Log success using Logger if available
+	# Log success using Logger if available (AR11: Use Logger autoload)
 	if is_instance_valid(GameLogger):
 		GameLogger.info("Game", "Game scene loaded successfully")
 		GameLogger.info("Game", "World, UI, and Camera subsystems ready")
@@ -74,9 +74,8 @@ func _ready() -> void:
 ## Cleanup when scene is being removed from tree
 ## Disconnects all EventBus signals to prevent memory leaks
 func _exit_tree() -> void:
-	# Emit scene unloading signal before cleanup
-	if is_instance_valid(EventBus):
-		EventBus.scene_unloading.emit("game")
+	# NOTE: EventBus.scene_unloading signal not yet defined in architecture
+	# TODO: Add to EventBus when scene lifecycle events are implemented
 
 	# Disconnect all EventBus signals (Story 0.5)
 	_disconnect_eventbus_signals()
@@ -194,8 +193,8 @@ func is_initialized() -> bool:
 
 
 ## Get reference to World node for external access
-## @return World node or null if not available
-func get_world() -> Node2D:
+## @return WorldManager node or null if not available
+func get_world() -> WorldManager:
 	return world
 
 
