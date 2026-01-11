@@ -3,13 +3,17 @@
 *.translation
 
 # Export builds
-export/*.apk
-export/*.aab
-export/*.zip
-export/*.exe
-export/*.dmg
-export/*.app
+export/**/*.apk
+export/**/*.aab
+export/**/*.zip
+export/**/*.exe
+export/**/*.dmg
+export/**/*.app
 export/android/*.keystore
+
+# Android build artifacts
+android/build/
+android/.build_version
 
 # Import cache (generated at runtime)
 .import/
