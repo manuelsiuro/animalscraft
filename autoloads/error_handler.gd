@@ -7,7 +7,7 @@
 ##
 ## Philosophy: AnimalsCraft is a cozy game - NEVER crash, NEVER show scary errors.
 ## All errors are handled silently with attempted recovery.
-class_name ErrorHandler
+## NOTE: No class_name to avoid conflict with autoload singleton
 extends Node
 
 # =============================================================================
@@ -59,8 +59,8 @@ const MAX_RECOVERY_ATTEMPTS: int = 3
 ##   ErrorHandler.handle_error("AI", "Animal stuck, resetting path", false)
 func handle_error(system: String, message: String, is_critical: bool = false) -> void:
 	# Always log the error (with null safety check for Logger dependency)
-	if is_instance_valid(Logger):
-		Logger.error(system, message)
+	if is_instance_valid(GameLogger):
+		GameLogger.error(system, message)
 	else:
 		push_error("[ErrorHandler][ERROR] %s: %s" % [system, message])
 
@@ -78,8 +78,8 @@ func report_recovered(system: String) -> void:
 	if _systems_in_error.has(system):
 		_systems_in_error.erase(system)
 		_recovery_attempts.erase(system)
-		if is_instance_valid(Logger):
-			Logger.info("ErrorHandler", "%s recovered from error state" % system)
+		if is_instance_valid(GameLogger):
+			GameLogger.info("ErrorHandler", "%s recovered from error state" % system)
 		error_recovered.emit(system)
 
 
@@ -138,12 +138,12 @@ func _attempt_recovery(system: String) -> void:
 
 	# Check if we've exceeded max attempts
 	if _recovery_attempts[system] > MAX_RECOVERY_ATTEMPTS:
-		if is_instance_valid(Logger):
-			Logger.error("ErrorHandler", "Max recovery attempts reached for %s, giving up" % system)
+		if is_instance_valid(GameLogger):
+			GameLogger.error("ErrorHandler", "Max recovery attempts reached for %s, giving up" % system)
 		return
 
-	if is_instance_valid(Logger):
-		Logger.info("ErrorHandler", "Attempting recovery for %s (attempt %d/%d)" % [
+	if is_instance_valid(GameLogger):
+		GameLogger.info("ErrorHandler", "Attempting recovery for %s (attempt %d/%d)" % [
 			system,
 			_recovery_attempts[system],
 			MAX_RECOVERY_ATTEMPTS
@@ -166,8 +166,8 @@ func _attempt_recovery(system: String) -> void:
 func _trigger_emergency_save() -> void:
 	# Check if SaveManager exists and is ready
 	if not is_instance_valid(get_node_or_null("/root/SaveManager")):
-		if is_instance_valid(Logger):
-			Logger.warn("ErrorHandler", "SaveManager not available for emergency save")
+		if is_instance_valid(GameLogger):
+			GameLogger.warn("ErrorHandler", "SaveManager not available for emergency save")
 		return
 
 	# Call emergency save using call_deferred to avoid issues during error handling
@@ -176,8 +176,8 @@ func _trigger_emergency_save() -> void:
 
 ## Recovery strategy for Save system errors.
 func _recover_save_system() -> void:
-	if is_instance_valid(Logger):
-		Logger.info("ErrorHandler", "Attempting Save system recovery...")
+	if is_instance_valid(GameLogger):
+		GameLogger.info("ErrorHandler", "Attempting Save system recovery...")
 	# SaveManager will handle its own recovery when available
 	# Just clear error state and let it retry on next save
 	report_recovered("Save")
@@ -185,8 +185,8 @@ func _recover_save_system() -> void:
 
 ## Recovery strategy for Audio system errors.
 func _recover_audio_system() -> void:
-	if is_instance_valid(Logger):
-		Logger.info("ErrorHandler", "Attempting Audio system recovery...")
+	if is_instance_valid(GameLogger):
+		GameLogger.info("ErrorHandler", "Attempting Audio system recovery...")
 
 	# Check if AudioManager exists and call reset directly (trust dependency exists)
 	var audio_manager := get_node_or_null("/root/AudioManager")
@@ -198,8 +198,8 @@ func _recover_audio_system() -> void:
 
 ## Recovery strategy for Game system errors.
 func _recover_game_system() -> void:
-	if is_instance_valid(Logger):
-		Logger.info("ErrorHandler", "Attempting Game system recovery...")
+	if is_instance_valid(GameLogger):
+		GameLogger.info("ErrorHandler", "Attempting Game system recovery...")
 
 	# Check if GameManager exists and call reset directly (trust dependency exists)
 	var game_manager := get_node_or_null("/root/GameManager")
@@ -211,8 +211,8 @@ func _recover_game_system() -> void:
 
 ## Generic recovery for unknown systems.
 func _generic_recovery(system: String) -> void:
-	if is_instance_valid(Logger):
-		Logger.info("ErrorHandler", "Generic recovery for %s - clearing error state" % system)
+	if is_instance_valid(GameLogger):
+		GameLogger.info("ErrorHandler", "Generic recovery for %s - clearing error state" % system)
 	# Just clear the error state and hope for the best
 	# Cozy game philosophy: never crash, always try to continue
 	report_recovered(system)

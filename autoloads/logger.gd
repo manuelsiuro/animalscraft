@@ -1,5 +1,5 @@
 ## Structured logging system for AnimalsCraft.
-## Autoload singleton - access via Logger.log(system, level, message)
+## Autoload singleton - access via GameLogger.write(system, level, message)
 ##
 ## Architecture: autoloads/logger.gd
 ## Order: 2 (no dependencies)
@@ -7,7 +7,8 @@
 ##
 ## Format: [System][LEVEL] Message
 ## Example: [Combat][INFO] Battle started: 3v2
-class_name Logger
+## NOTE: Renamed from Logger to GameLogger to avoid conflict with native Godot class
+## NOTE: No class_name to avoid conflict with autoload singleton
 extends Node
 
 # =============================================================================
@@ -57,9 +58,9 @@ var _file_logging_initialized: bool = false
 ## @param message The log message
 ##
 ## Usage:
-##   Logger.log("Combat", Logger.Level.INFO, "Battle started: 3v2")
-##   Logger.log("Save", Logger.Level.ERROR, "Failed to write save file")
-func log(system: String, level: Level, message: String) -> void:
+##   GameLogger.write("Combat", GameLogger.Level.INFO, "Battle started: 3v2")
+##   GameLogger.write("Save", GameLogger.Level.ERROR, "Failed to write save file")
+func write(system: String, level: Level, message: String) -> void:
 	# Filter by build type and log level
 	if not _should_log(level):
 		return
@@ -75,22 +76,22 @@ func log(system: String, level: Level, message: String) -> void:
 ## Convenience method for debug logging.
 ## Only outputs in debug builds.
 func debug(system: String, message: String) -> void:
-	log(system, Level.DEBUG, message)
+	write(system, Level.DEBUG, message)
 
 
 ## Convenience method for info logging.
 func info(system: String, message: String) -> void:
-	log(system, Level.INFO, message)
+	write(system, Level.INFO, message)
 
 
 ## Convenience method for warning logging.
 func warn(system: String, message: String) -> void:
-	log(system, Level.WARN, message)
+	write(system, Level.WARN, message)
 
 
 ## Convenience method for error logging.
 func error(system: String, message: String) -> void:
-	log(system, Level.ERROR, message)
+	write(system, Level.ERROR, message)
 
 
 # =============================================================================
@@ -107,7 +108,7 @@ func _should_log(level: Level) -> bool:
 ## Format the log message with system and level prefix.
 ## Format: [System][LEVEL] Message (per Architecture spec)
 func _format_message(system: String, level: Level, message: String) -> String:
-	var level_str := Level.keys()[level]
+	var level_str: String = Level.keys()[level]
 	return "[%s][%s] %s" % [system, level_str, message]
 
 

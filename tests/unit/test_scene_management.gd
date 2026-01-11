@@ -55,7 +55,7 @@ func test_main_scene_critical_autoloads_list() -> void:
 	var main_instance := Main.new()
 
 	assert_has(main_instance.CRITICAL_AUTOLOADS, "GameConstants", "CRITICAL_AUTOLOADS should include GameConstants")
-	assert_has(main_instance.CRITICAL_AUTOLOADS, "Logger", "CRITICAL_AUTOLOADS should include Logger")
+	assert_has(main_instance.CRITICAL_AUTOLOADS, "GameLogger", "CRITICAL_AUTOLOADS should include GameLogger")
 	assert_has(main_instance.CRITICAL_AUTOLOADS, "ErrorHandler", "CRITICAL_AUTOLOADS should include ErrorHandler")
 	assert_has(main_instance.CRITICAL_AUTOLOADS, "EventBus", "CRITICAL_AUTOLOADS should include EventBus")
 
@@ -194,8 +194,8 @@ func test_game_script_lifecycle_handlers() -> void:
 
 ## Test display configuration matches Architecture requirements
 func test_display_configuration() -> void:
-	var viewport_width := ProjectSettings.get_setting("display/window/size/viewport_width")
-	var viewport_height := ProjectSettings.get_setting("display/window/size/viewport_height")
+	var viewport_width: int = ProjectSettings.get_setting("display/window/size/viewport_width")
+	var viewport_height: int = ProjectSettings.get_setting("display/window/size/viewport_height")
 
 	assert_eq(viewport_width, 1080, "Viewport width should be 1080")
 	assert_eq(viewport_height, 1920, "Viewport height should be 1920")
@@ -203,20 +203,20 @@ func test_display_configuration() -> void:
 
 ## Test portrait orientation is set
 func test_portrait_orientation() -> void:
-	var orientation := ProjectSettings.get_setting("display/window/handheld/orientation")
+	var orientation: int = ProjectSettings.get_setting("display/window/handheld/orientation")
 	# orientation=1 is portrait in Godot
 	assert_eq(orientation, 1, "Orientation should be portrait (1)")
 
 
 ## Test mobile renderer is configured
 func test_mobile_renderer() -> void:
-	var renderer := ProjectSettings.get_setting("rendering/renderer/rendering_method")
+	var renderer: String = ProjectSettings.get_setting("rendering/renderer/rendering_method")
 	assert_eq(renderer, "mobile", "Renderer should be mobile")
 
 
 ## Test touch emulation is enabled
 func test_touch_emulation() -> void:
-	var touch_emulation := ProjectSettings.get_setting("input_devices/pointing/emulate_touch_from_mouse")
+	var touch_emulation: bool = ProjectSettings.get_setting("input_devices/pointing/emulate_touch_from_mouse")
 	assert_true(touch_emulation, "Touch emulation should be enabled")
 
 
@@ -239,90 +239,60 @@ func test_eventbus_autoload_signals_exist() -> void:
 
 ## Test scene_loading signal emission
 func test_scene_loading_signal_emission() -> void:
-	var signal_received := false
-	var received_path := ""
-
-	var callback := func(path: String) -> void:
-		signal_received = true
-		received_path = path
-
-	EventBus.scene_loading.connect(callback)
+	watch_signals(EventBus)
 	EventBus.scene_loading.emit("res://scenes/test.tscn")
 
-	assert_true(signal_received, "scene_loading signal should be received")
-	assert_eq(received_path, "res://scenes/test.tscn", "Signal should carry correct path")
-
-	EventBus.scene_loading.disconnect(callback)
+	assert_signal_emitted(EventBus, "scene_loading")
+	var params = get_signal_parameters(EventBus, "scene_loading")
+	assert_not_null(params, "Signal parameters should not be null")
+	if params != null and params.size() > 0:
+		assert_eq(params[0], "res://scenes/test.tscn", "Signal should carry correct path")
 
 
 ## Test scene_loaded signal emission
 func test_scene_loaded_signal_emission() -> void:
-	var signal_received := false
-	var received_name := ""
-
-	var callback := func(name: String) -> void:
-		signal_received = true
-		received_name = name
-
-	EventBus.scene_loaded.connect(callback)
+	watch_signals(EventBus)
 	EventBus.scene_loaded.emit("game")
 
-	assert_true(signal_received, "scene_loaded signal should be received")
-	assert_eq(received_name, "game", "Signal should carry correct name")
-
-	EventBus.scene_loaded.disconnect(callback)
+	assert_signal_emitted(EventBus, "scene_loaded")
+	var params = get_signal_parameters(EventBus, "scene_loaded")
+	assert_not_null(params, "Signal parameters should not be null")
+	if params != null and params.size() > 0:
+		assert_eq(params[0], "game", "Signal should carry correct name")
 
 
 ## Test scene_unloading signal emission
 func test_scene_unloading_signal_emission() -> void:
-	var signal_received := false
-	var received_name := ""
-
-	var callback := func(name: String) -> void:
-		signal_received = true
-		received_name = name
-
-	EventBus.scene_unloading.connect(callback)
+	watch_signals(EventBus)
 	EventBus.scene_unloading.emit("main")
 
-	assert_true(signal_received, "scene_unloading signal should be received")
-	assert_eq(received_name, "main", "Signal should carry correct name")
-
-	EventBus.scene_unloading.disconnect(callback)
+	assert_signal_emitted(EventBus, "scene_unloading")
+	var params = get_signal_parameters(EventBus, "scene_unloading")
+	assert_not_null(params, "Signal parameters should not be null")
+	if params != null and params.size() > 0:
+		assert_eq(params[0], "main", "Signal should carry correct name")
 
 
 ## Test autoloads_ready signal emission
 func test_autoloads_ready_signal_emission() -> void:
-	var signal_received := false
-
-	var callback := func() -> void:
-		signal_received = true
-
-	EventBus.autoloads_ready.connect(callback)
+	watch_signals(EventBus)
 	EventBus.autoloads_ready.emit()
 
-	assert_true(signal_received, "autoloads_ready signal should be received")
-
-	EventBus.autoloads_ready.disconnect(callback)
+	assert_signal_emitted(EventBus, "autoloads_ready")
 
 
 ## Test autoloads_failed signal emission
 func test_autoloads_failed_signal_emission() -> void:
-	var signal_received := false
-	var received_missing: Array = []
-
-	var callback := func(missing: Array) -> void:
-		signal_received = true
-		received_missing = missing
-
-	EventBus.autoloads_failed.connect(callback)
+	watch_signals(EventBus)
 	EventBus.autoloads_failed.emit(["TestAutoload"])
 
-	assert_true(signal_received, "autoloads_failed signal should be received")
-	assert_eq(received_missing.size(), 1, "Signal should carry missing autoloads array")
-	assert_eq(received_missing[0], "TestAutoload", "Array should contain correct autoload name")
-
-	EventBus.autoloads_failed.disconnect(callback)
+	assert_signal_emitted(EventBus, "autoloads_failed")
+	var params = get_signal_parameters(EventBus, "autoloads_failed")
+	assert_not_null(params, "Signal parameters should not be null")
+	if params != null and params.size() > 0:
+		var received_missing: Array = params[0]
+		assert_eq(received_missing.size(), 1, "Signal should carry missing autoloads array")
+		assert_eq(received_missing[0], "TestAutoload", "Array should contain correct autoload name")
 
 
 # =============================================================================
@@ -333,7 +303,7 @@ func test_autoloads_failed_signal_emission() -> void:
 func test_main_scene_autoload_verification() -> void:
 	# All autoloads should be accessible
 	assert_not_null(get_node_or_null("/root/GameConstants"), "GameConstants should be accessible")
-	assert_not_null(get_node_or_null("/root/Logger"), "Logger should be accessible")
+	assert_not_null(get_node_or_null("/root/GameLogger"), "GameLogger should be accessible")
 	assert_not_null(get_node_or_null("/root/ErrorHandler"), "ErrorHandler should be accessible")
 	assert_not_null(get_node_or_null("/root/EventBus"), "EventBus should be accessible")
 	assert_not_null(get_node_or_null("/root/Settings"), "Settings should be accessible")

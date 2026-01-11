@@ -7,7 +7,7 @@
 ##
 ## Stores player preferences in user://settings.cfg
 ## Emits EventBus.setting_changed when values change
-class_name Settings
+## NOTE: No class_name to avoid conflict with autoload singleton
 extends Node
 
 # =============================================================================
@@ -260,7 +260,7 @@ func reset_to_defaults() -> void:
 			_config.set_value(section, key, DEFAULTS[section][key])
 
 	_save_settings()
-	Logger.info("Settings", "Reset all settings to defaults")
+	GameLogger.info("Settings", "Reset all settings to defaults")
 
 
 ## Force save settings to disk.
@@ -294,14 +294,14 @@ func _load_settings() -> void:
 
 	if err != OK:
 		if err == ERR_FILE_NOT_FOUND:
-			Logger.info("Settings", "No settings file found, using defaults")
+			GameLogger.info("Settings", "No settings file found, using defaults")
 			_apply_defaults()
 			_save_settings()
 		else:
-			Logger.warn("Settings", "Failed to load settings: %s" % error_string(err))
+			GameLogger.warn("Settings", "Failed to load settings: %s" % error_string(err))
 			_apply_defaults()
 	else:
-		Logger.info("Settings", "Settings loaded successfully")
+		GameLogger.info("Settings", "Settings loaded successfully")
 		# Ensure all default keys exist (for version upgrades)
 		_ensure_all_keys_exist()
 
@@ -322,7 +322,7 @@ func _ensure_all_keys_exist() -> void:
 			if not _config.has_section_key(section, key):
 				_config.set_value(section, key, DEFAULTS[section][key])
 				added_keys = true
-				Logger.info("Settings", "Added new setting: %s.%s" % [section, key])
+				GameLogger.info("Settings", "Added new setting: %s.%s" % [section, key])
 
 	if added_keys:
 		_save_settings()
@@ -333,6 +333,6 @@ func _save_settings() -> void:
 	var err := _config.save(SETTINGS_PATH)
 
 	if err != OK:
-		Logger.error("Settings", "Failed to save settings: %s" % error_string(err))
+		GameLogger.error("Settings", "Failed to save settings: %s" % error_string(err))
 	else:
 		_dirty = false

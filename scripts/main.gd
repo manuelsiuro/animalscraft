@@ -10,7 +10,7 @@
 ## - Follows AR18 null safety with early return guard clauses
 ##
 ## Autoload Verification (Story 0.5):
-## - Verifies all 8 autoloads are accessible: GameConstants, Logger, ErrorHandler,
+## - Verifies all 8 autoloads are accessible: GameConstants, GameLogger, ErrorHandler,
 ##   EventBus, Settings, AudioManager, SaveManager, GameManager
 ## - Emits EventBus.autoloads_ready() on success
 ## - Emits EventBus.autoloads_failed(missing) on failure with graceful degradation
@@ -23,7 +23,7 @@ extends Node
 ## List of required autoloads in initialization order.
 ## Critical autoloads (first 4) are required for basic operation.
 ## Non-critical autoloads (last 4) allow graceful degradation.
-const CRITICAL_AUTOLOADS := ["GameConstants", "Logger", "ErrorHandler", "EventBus"]
+const CRITICAL_AUTOLOADS := ["GameConstants", "GameLogger", "ErrorHandler", "EventBus"]
 const NON_CRITICAL_AUTOLOADS := ["Settings", "AudioManager", "SaveManager", "GameManager"]
 
 
@@ -51,12 +51,12 @@ func _ready() -> void:
 		# All autoloads ready - emit success signal
 		if is_instance_valid(EventBus) and EventBus.has_signal("autoloads_ready"):
 			EventBus.autoloads_ready.emit()
-		Logger.info("Main", "All 8 autoloads verified and ready")
+		GameLogger.info("Main", "All 8 autoloads verified and ready")
 	elif autoload_result.all_critical_ready:
 		# Critical autoloads ready, some non-critical missing - graceful degradation
 		if is_instance_valid(EventBus) and EventBus.has_signal("autoloads_failed"):
 			EventBus.autoloads_failed.emit(autoload_result.missing)
-		Logger.warn("Main", "Non-critical autoloads missing: %s - some features disabled" % [autoload_result.missing])
+		GameLogger.warn("Main", "Non-critical autoloads missing: %s - some features disabled" % [autoload_result.missing])
 	else:
 		# Critical autoloads missing - cannot operate safely
 		push_error("[Main] CRITICAL: Required autoloads missing: %s" % [autoload_result.missing])
@@ -66,9 +66,9 @@ func _ready() -> void:
 		return
 
 	# Log successful initialization
-	if is_instance_valid(Logger):
-		Logger.info("Main", "AnimalsCraft v0.1.0 initialized")
-		Logger.info("Main", "Project Foundation - Story 0.5 complete")
+	if is_instance_valid(GameLogger):
+		GameLogger.info("Main", "AnimalsCraft v0.1.0 initialized")
+		GameLogger.info("Main", "Project Foundation - Story 0.5 complete")
 	else:
 		print("[Main] AnimalsCraft v0.1.0 initialized")
 

@@ -6,7 +6,7 @@
 ## Source: game-architecture.md#Save System Schema
 ##
 ## Handles game persistence with JSON format, auto-save, and versioning.
-class_name SaveManager
+## NOTE: No class_name to avoid conflict with autoload singleton
 extends Node
 
 # =============================================================================
@@ -64,7 +64,7 @@ func _ready() -> void:
 	# (Settings loads in _ready too, so we can't guarantee order)
 	call_deferred("_start_autosave_if_enabled")
 
-	Logger.info("SaveManager", "Save system initialized")
+	GameLogger.info("SaveManager", "Save system initialized")
 
 
 func _notification(what: int) -> void:
@@ -83,11 +83,11 @@ func _notification(what: int) -> void:
 ## @return True if save was successful
 func save_game(slot: int = 0) -> bool:
 	if _save_in_progress:
-		Logger.warn("SaveManager", "Save already in progress")
+		GameLogger.warn("SaveManager", "Save already in progress")
 		return false
 
 	if slot < 0 or slot >= GameConstants.MAX_SAVE_SLOTS:
-		Logger.error("SaveManager", "Invalid save slot: %d" % slot)
+		GameLogger.error("SaveManager", "Invalid save slot: %d" % slot)
 		return false
 
 	_save_in_progress = true
@@ -102,9 +102,9 @@ func save_game(slot: int = 0) -> bool:
 
 	if success:
 		_last_save_slot = slot
-		Logger.info("SaveManager", "Game saved to slot %d" % slot)
+		GameLogger.info("SaveManager", "Game saved to slot %d" % slot)
 	else:
-		Logger.error("SaveManager", "Failed to save game to slot %d" % slot)
+		GameLogger.error("SaveManager", "Failed to save game to slot %d" % slot)
 
 	return success
 
@@ -112,7 +112,7 @@ func save_game(slot: int = 0) -> bool:
 ## Emergency save to prevent data loss.
 ## Called by ErrorHandler during critical errors.
 func emergency_save() -> void:
-	Logger.warn("SaveManager", "Performing emergency save...")
+	GameLogger.warn("SaveManager", "Performing emergency save...")
 
 	var save_data := _gather_save_data()
 	save_data["emergency"] = true
@@ -122,9 +122,9 @@ func emergency_save() -> void:
 	var success := _write_json_file(path, save_data)
 
 	if success:
-		Logger.info("SaveManager", "Emergency save completed: %s" % path)
+		GameLogger.info("SaveManager", "Emergency save completed: %s" % path)
 	else:
-		Logger.error("SaveManager", "Emergency save FAILED")
+		GameLogger.error("SaveManager", "Emergency save FAILED")
 
 
 ## Quick save to last used slot (or slot 0 if none).
@@ -142,15 +142,15 @@ func quick_save() -> bool:
 ## @return True if load was successful
 func load_game(slot: int = 0) -> bool:
 	if _load_in_progress:
-		Logger.warn("SaveManager", "Load already in progress")
+		GameLogger.warn("SaveManager", "Load already in progress")
 		return false
 
 	if slot < 0 or slot >= GameConstants.MAX_SAVE_SLOTS:
-		Logger.error("SaveManager", "Invalid load slot: %d" % slot)
+		GameLogger.error("SaveManager", "Invalid load slot: %d" % slot)
 		return false
 
 	if not save_exists(slot):
-		Logger.warn("SaveManager", "No save found in slot %d" % slot)
+		GameLogger.warn("SaveManager", "No save found in slot %d" % slot)
 		return false
 
 	_load_in_progress = true
@@ -160,7 +160,7 @@ func load_game(slot: int = 0) -> bool:
 	var success := false
 
 	if save_data.is_empty():
-		Logger.error("SaveManager", "Failed to read save data from slot %d" % slot)
+		GameLogger.error("SaveManager", "Failed to read save data from slot %d" % slot)
 	else:
 		success = _apply_save_data(save_data)
 
@@ -170,9 +170,9 @@ func load_game(slot: int = 0) -> bool:
 
 	if success:
 		_last_save_slot = slot
-		Logger.info("SaveManager", "Game loaded from slot %d" % slot)
+		GameLogger.info("SaveManager", "Game loaded from slot %d" % slot)
 	else:
-		Logger.error("SaveManager", "Failed to load game from slot %d" % slot)
+		GameLogger.error("SaveManager", "Failed to load game from slot %d" % slot)
 
 	return success
 
@@ -183,7 +183,7 @@ func load_emergency_save() -> bool:
 	var path := GameConstants.SAVE_DIRECTORY + GameConstants.EMERGENCY_SAVE_FILE
 
 	if not FileAccess.file_exists(path):
-		Logger.info("SaveManager", "No emergency save found")
+		GameLogger.info("SaveManager", "No emergency save found")
 		return false
 
 	_load_in_progress = true
@@ -200,11 +200,11 @@ func load_emergency_save() -> bool:
 	EventBus.load_completed.emit(success)
 
 	if success:
-		Logger.info("SaveManager", "Emergency save loaded successfully")
+		GameLogger.info("SaveManager", "Emergency save loaded successfully")
 		# Delete emergency save after successful load
 		DirAccess.remove_absolute(path)
 	else:
-		Logger.error("SaveManager", "Failed to load emergency save")
+		GameLogger.error("SaveManager", "Failed to load emergency save")
 
 	return success
 
@@ -256,10 +256,10 @@ func delete_save(slot: int) -> bool:
 
 	var err := DirAccess.remove_absolute(path)
 	if err == OK:
-		Logger.info("SaveManager", "Deleted save slot %d" % slot)
+		GameLogger.info("SaveManager", "Deleted save slot %d" % slot)
 		return true
 	else:
-		Logger.error("SaveManager", "Failed to delete save slot %d: %s" % [slot, error_string(err)])
+		GameLogger.error("SaveManager", "Failed to delete save slot %d: %s" % [slot, error_string(err)])
 		return false
 
 
@@ -299,9 +299,9 @@ func _gather_save_data() -> Dictionary:
 
 	# Warn if we're saving placeholder/empty data (systems not yet implemented)
 	if save_data["animals"].is_empty():
-		Logger.warn("SaveManager", "Saving with empty animals data (system not yet implemented)")
+		GameLogger.warn("SaveManager", "Saving with empty animals data (system not yet implemented)")
 	if save_data["world"]["buildings"].is_empty():
-		Logger.warn("SaveManager", "Saving with empty buildings data (system not yet implemented)")
+		GameLogger.warn("SaveManager", "Saving with empty buildings data (system not yet implemented)")
 
 	return save_data
 
@@ -365,7 +365,7 @@ func _apply_save_data(save_data: Dictionary) -> bool:
 	# Validate version
 	var version := save_data.get("version", 0) as int
 	if version > SCHEMA_VERSION:
-		Logger.error("SaveManager", "Save version %d is newer than supported %d" % [version, SCHEMA_VERSION])
+		GameLogger.error("SaveManager", "Save version %d is newer than supported %d" % [version, SCHEMA_VERSION])
 		return false
 
 	# Migrate if needed
@@ -388,7 +388,7 @@ func _apply_save_data(save_data: Dictionary) -> bool:
 
 ## Migrate save data from older versions.
 func _migrate_save_data(save_data: Dictionary, from_version: int) -> Dictionary:
-	Logger.info("SaveManager", "Migrating save from v%d to v%d" % [from_version, SCHEMA_VERSION])
+	GameLogger.info("SaveManager", "Migrating save from v%d to v%d" % [from_version, SCHEMA_VERSION])
 
 	# Add migration steps as schema evolves
 	# Example:
@@ -407,13 +407,13 @@ func _migrate_save_data(save_data: Dictionary, from_version: int) -> Dictionary:
 func _ensure_save_directory() -> void:
 	var dir := DirAccess.open("user://")
 	if dir == null:
-		Logger.error("SaveManager", "Cannot access user directory")
+		GameLogger.error("SaveManager", "Cannot access user directory")
 		return
 
 	if not dir.dir_exists("saves"):
 		var err := dir.make_dir("saves")
 		if err != OK:
-			Logger.error("SaveManager", "Failed to create saves directory: %s" % error_string(err))
+			GameLogger.error("SaveManager", "Failed to create saves directory: %s" % error_string(err))
 
 
 ## Get the file path for a save slot.
@@ -439,7 +439,7 @@ func _write_json_file(path: String, data: Dictionary) -> bool:
 
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
-		Logger.error("SaveManager", "Cannot open file for writing: %s" % path)
+		GameLogger.error("SaveManager", "Cannot open file for writing: %s" % path)
 		return false
 
 	file.store_string(json_string)
@@ -454,7 +454,7 @@ func _read_json_file(path: String) -> Dictionary:
 
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		Logger.error("SaveManager", "Cannot open file for reading: %s" % path)
+		GameLogger.error("SaveManager", "Cannot open file for reading: %s" % path)
 		return {}
 
 	var json_string := file.get_as_text()
@@ -463,14 +463,14 @@ func _read_json_file(path: String) -> Dictionary:
 	var json := JSON.new()
 	var err := json.parse(json_string)
 	if err != OK:
-		Logger.error("SaveManager", "JSON parse error at line %d: %s" % [json.get_error_line(), json.get_error_message()])
+		GameLogger.error("SaveManager", "JSON parse error at line %d: %s" % [json.get_error_line(), json.get_error_message()])
 		return {}
 
 	var data = json.get_data()
 	if data is Dictionary:
 		return data
 	else:
-		Logger.error("SaveManager", "Save file is not a valid dictionary")
+		GameLogger.error("SaveManager", "Save file is not a valid dictionary")
 		return {}
 
 
@@ -494,7 +494,7 @@ func _setup_autosave_timer() -> void:
 func _start_autosave_if_enabled() -> void:
 	if is_instance_valid(Settings) and Settings.is_auto_save_enabled():
 		_autosave_timer.start()
-		Logger.debug("SaveManager", "Autosave timer started (interval: %.0fs)" % GameConstants.AUTOSAVE_INTERVAL)
+		GameLogger.debug("SaveManager", "Autosave timer started (interval: %.0fs)" % GameConstants.AUTOSAVE_INTERVAL)
 
 
 ## Perform an autosave.
@@ -502,7 +502,7 @@ func _perform_autosave() -> void:
 	if not Settings.is_auto_save_enabled():
 		return
 
-	Logger.debug("SaveManager", "Autosave triggered")
+	GameLogger.debug("SaveManager", "Autosave triggered")
 	quick_save()
 
 

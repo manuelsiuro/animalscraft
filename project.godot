@@ -20,7 +20,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 GameConstants="*res://autoloads/game_constants.gd"
-Logger="*res://autoloads/logger.gd"
+GameLogger="*res://autoloads/logger.gd"
 ErrorHandler="*res://autoloads/error_handler.gd"
 EventBus="*res://autoloads/event_bus.gd"
 Settings="*res://autoloads/settings.gd"
@@ -35,6 +35,10 @@ window/size/viewport_height=1920
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep_width"
 window/handheld/orientation=1
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
 [input_devices]
 

@@ -63,9 +63,9 @@ func _ready() -> void:
 	_initialized = true
 
 	# Log success using Logger if available
-	if is_instance_valid(Logger):
-		Logger.info("Game", "Game scene loaded successfully")
-		Logger.info("Game", "World, UI, and Camera subsystems ready")
+	if is_instance_valid(GameLogger):
+		GameLogger.info("Game", "Game scene loaded successfully")
+		GameLogger.info("Game", "World, UI, and Camera subsystems ready")
 	else:
 		print("[Game] Game scene loaded successfully")
 		print("[Game] World, UI, and Camera subsystems ready")
@@ -81,8 +81,8 @@ func _exit_tree() -> void:
 	# Disconnect all EventBus signals (Story 0.5)
 	_disconnect_eventbus_signals()
 
-	if is_instance_valid(Logger):
-		Logger.info("Game", "Game scene unloading - cleanup complete")
+	if is_instance_valid(GameLogger):
+		GameLogger.info("Game", "Game scene unloading - cleanup complete")
 
 
 ## Verify all required child nodes exist
@@ -167,22 +167,22 @@ func _configure_camera() -> void:
 	camera.position_smoothing_enabled = true
 	camera.position_smoothing_speed = 5.0
 
-	if is_instance_valid(Logger):
-		Logger.debug("Game", "Camera configured: zoom=%.1f, limits set, smoothing enabled" % camera.zoom.x)
+	if is_instance_valid(GameLogger):
+		GameLogger.debug("Game", "Camera configured: zoom=%.1f, limits set, smoothing enabled" % camera.zoom.x)
 
 
 ## Handle game pause event
 func _on_game_paused() -> void:
-	if is_instance_valid(Logger):
-		Logger.debug("Game", "Game paused - subsystems notified")
+	if is_instance_valid(GameLogger):
+		GameLogger.debug("Game", "Game paused - subsystems notified")
 
 	# Future: Pause animations, disable input, etc.
 
 
 ## Handle game resume event
 func _on_game_resumed() -> void:
-	if is_instance_valid(Logger):
-		Logger.debug("Game", "Game resumed - subsystems notified")
+	if is_instance_valid(GameLogger):
+		GameLogger.debug("Game", "Game resumed - subsystems notified")
 
 	# Future: Resume animations, enable input, etc.
 

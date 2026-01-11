@@ -7,7 +7,7 @@
 ##
 ## Handles music playback, SFX, and volume control.
 ## Respects Settings for volume and mute state.
-class_name AudioManager
+## NOTE: No class_name to avoid conflict with autoload singleton
 extends Node
 
 # =============================================================================
@@ -52,7 +52,7 @@ func _ready() -> void:
 	# Listen for settings changes
 	EventBus.setting_changed.connect(_on_setting_changed)
 
-	Logger.info("AudioManager", "Audio system initialized")
+	GameLogger.info("AudioManager", "Audio system initialized")
 
 
 # =============================================================================
@@ -64,7 +64,7 @@ func _ready() -> void:
 ## @param fade_in If true, fade in the music
 func play_music(stream: AudioStream, fade_in: bool = true) -> void:
 	if stream == null:
-		Logger.warn("AudioManager", "Attempted to play null music stream")
+		GameLogger.warn("AudioManager", "Attempted to play null music stream")
 		return
 
 	if Settings.is_muted():
@@ -88,7 +88,7 @@ func play_music(stream: AudioStream, fade_in: bool = true) -> void:
 		_music_player.stream = stream
 		_music_player.play()
 
-	Logger.debug("AudioManager", "Playing music: %s" % stream.resource_path)
+	GameLogger.debug("AudioManager", "Playing music: %s" % stream.resource_path)
 
 
 ## Play music from a file path.
@@ -102,7 +102,7 @@ func play_music_from_path(path: String, fade_in: bool = true) -> void:
 
 	var stream := load(path) as AudioStream
 	if stream == null:
-		Logger.error("AudioManager", "Failed to load music: %s" % path)
+		GameLogger.error("AudioManager", "Failed to load music: %s" % path)
 		return
 
 	play_music(stream, fade_in)
@@ -125,7 +125,7 @@ func stop_music(fade_out: bool = true) -> void:
 	else:
 		_music_player.stop()
 
-	Logger.debug("AudioManager", "Stopping music")
+	GameLogger.debug("AudioManager", "Stopping music")
 
 
 ## Pause music playback.
@@ -159,7 +159,7 @@ func play_sfx(stream: AudioStream, volume_offset: float = 0.0) -> void:
 
 	var player := _get_available_sfx_player()
 	if player == null:
-		Logger.debug("AudioManager", "No available SFX players")
+		GameLogger.debug("AudioManager", "No available SFX players")
 		return
 
 	player.volume_db = _get_sfx_volume_db() + volume_offset
@@ -183,7 +183,7 @@ func play_sfx_from_path(path: String, volume_offset: float = 0.0) -> void:
 	else:
 		stream = load(path) as AudioStream
 		if stream == null:
-			Logger.error("AudioManager", "Failed to load SFX: %s" % path)
+			GameLogger.error("AudioManager", "Failed to load SFX: %s" % path)
 			return
 		_sfx_cache[path] = stream
 
@@ -245,7 +245,7 @@ func reset() -> void:
 	stop_music(false)
 	_stop_all_sfx()
 	_apply_settings()
-	Logger.info("AudioManager", "Audio system reset")
+	GameLogger.info("AudioManager", "Audio system reset")
 
 
 # =============================================================================

@@ -4,7 +4,7 @@
 ## Architecture: autoloads/game_constants.gd
 ## Order: 1 (no dependencies)
 ## Source: game-architecture.md#Configuration
-class_name GameConstants
+## NOTE: No class_name to avoid conflict with autoload singleton
 extends Node
 
 # =============================================================================

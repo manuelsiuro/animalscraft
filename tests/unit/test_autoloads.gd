@@ -70,25 +70,25 @@ func test_game_constants_categories_exist() -> void:
 
 ## Test that Logger autoload exists
 func test_logger_autoload_exists() -> void:
-	var logger := get_node_or_null("/root/Logger")
-	assert_not_null(logger, "Logger autoload should exist")
+	var logger := get_node_or_null("/root/GameLogger")
+	assert_not_null(logger, "GameLogger autoload should exist")
 
 
 ## Test that Logger Level enum exists with correct values
 func test_logger_level_enum() -> void:
-	assert_eq(Logger.Level.DEBUG, 0, "DEBUG should be 0")
-	assert_eq(Logger.Level.INFO, 1, "INFO should be 1")
-	assert_eq(Logger.Level.WARN, 2, "WARN should be 2")
-	assert_eq(Logger.Level.ERROR, 3, "ERROR should be 3")
+	assert_eq(GameLogger.Level.DEBUG, 0, "DEBUG should be 0")
+	assert_eq(GameLogger.Level.INFO, 1, "INFO should be 1")
+	assert_eq(GameLogger.Level.WARN, 2, "WARN should be 2")
+	assert_eq(GameLogger.Level.ERROR, 3, "ERROR should be 3")
 
 
 ## Test that Logger convenience methods exist
 func test_logger_convenience_methods_exist() -> void:
-	assert_true(Logger.has_method("log"), "Logger should have log() method")
-	assert_true(Logger.has_method("debug"), "Logger should have debug() method")
-	assert_true(Logger.has_method("info"), "Logger should have info() method")
-	assert_true(Logger.has_method("warn"), "Logger should have warn() method")
-	assert_true(Logger.has_method("error"), "Logger should have error() method")
+	assert_true(GameLogger.has_method("write"), "GameLogger should have write() method")
+	assert_true(GameLogger.has_method("debug"), "Logger should have debug() method")
+	assert_true(GameLogger.has_method("info"), "Logger should have info() method")
+	assert_true(GameLogger.has_method("warn"), "Logger should have warn() method")
+	assert_true(GameLogger.has_method("error"), "Logger should have error() method")
 
 
 # =============================================================================
@@ -165,20 +165,15 @@ func test_event_bus_progression_signals() -> void:
 
 ## Test signal emission and reception
 func test_event_bus_signal_emission() -> void:
-	var signal_received := false
-	var received_value: Variant = null
-
-	var callback := func(value: Variant) -> void:
-		signal_received = true
-		received_value = value
-
-	EventBus.setting_changed.connect(callback)
+	watch_signals(EventBus)
 	EventBus.setting_changed.emit("test_setting", "test_value")
 
-	assert_true(signal_received, "Signal should be received")
-	assert_eq(received_value, "test_value", "Signal should carry correct value")
-
-	EventBus.setting_changed.disconnect(callback)
+	assert_signal_emitted(EventBus, "setting_changed")
+	var params = get_signal_parameters(EventBus, "setting_changed")
+	assert_not_null(params, "Signal parameters should not be null")
+	if params != null and params.size() >= 2:
+		assert_eq(params[0], "test_setting", "Signal should carry correct setting name")
+		assert_eq(params[1], "test_value", "Signal should carry correct value")
 
 
 # =============================================================================
@@ -361,7 +356,7 @@ func test_game_manager_initial_state() -> void:
 ## Test that all autoloads are registered
 func test_all_autoloads_registered() -> void:
 	assert_not_null(get_node_or_null("/root/GameConstants"), "GameConstants should be registered")
-	assert_not_null(get_node_or_null("/root/Logger"), "Logger should be registered")
+	assert_not_null(get_node_or_null("/root/GameLogger"), "Logger should be registered")
 	assert_not_null(get_node_or_null("/root/ErrorHandler"), "ErrorHandler should be registered")
 	assert_not_null(get_node_or_null("/root/EventBus"), "EventBus should be registered")
 	assert_not_null(get_node_or_null("/root/Settings"), "Settings should be registered")
@@ -375,7 +370,7 @@ func test_autoload_order() -> void:
 	# Get all autoload indices
 	var root := get_tree().root
 	var game_constants_idx := root.get_child(root.get_node("GameConstants").get_index()).get_index()
-	var logger_idx := root.get_child(root.get_node("Logger").get_index()).get_index()
+	var logger_idx := root.get_child(root.get_node("GameLogger").get_index()).get_index()
 	var error_handler_idx := root.get_child(root.get_node("ErrorHandler").get_index()).get_index()
 	var event_bus_idx := root.get_child(root.get_node("EventBus").get_index()).get_index()
 	var settings_idx := root.get_child(root.get_node("Settings").get_index()).get_index()
@@ -383,9 +378,9 @@ func test_autoload_order() -> void:
 	var save_manager_idx := root.get_child(root.get_node("SaveManager").get_index()).get_index()
 	var game_manager_idx := root.get_child(root.get_node("GameManager").get_index()).get_index()
 
-	# Verify order: GameConstants < Logger < ErrorHandler < EventBus < Settings < AudioManager < SaveManager < GameManager
-	assert_true(game_constants_idx < logger_idx, "GameConstants should load before Logger")
-	assert_true(logger_idx < error_handler_idx, "Logger should load before ErrorHandler")
+	# Verify order: GameConstants < GameLogger < ErrorHandler < EventBus < Settings < AudioManager < SaveManager < GameManager
+	assert_true(game_constants_idx < logger_idx, "GameConstants should load before GameLogger")
+	assert_true(logger_idx < error_handler_idx, "GameLogger should load before ErrorHandler")
 	assert_true(error_handler_idx < event_bus_idx, "ErrorHandler should load before EventBus")
 	assert_true(event_bus_idx < settings_idx, "EventBus should load before Settings")
 	assert_true(settings_idx < audio_manager_idx, "Settings should load before AudioManager")

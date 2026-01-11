@@ -7,7 +7,7 @@
 ##
 ## Controls game state, pause, time scale, and coordinates other systems.
 ## Story 0.5: Added scene transition methods (change_to_game_scene, change_to_main_scene)
-class_name GameManager
+## NOTE: No class_name to avoid conflict with autoload singleton
 extends Node
 
 # =============================================================================
@@ -71,7 +71,7 @@ func _ready() -> void:
 	# Transition to menu state
 	_transition_to_state(GameState.MENU)
 
-	Logger.info("GameManager", "Game manager initialized")
+	GameLogger.info("GameManager", "Game manager initialized")
 
 
 func _process(delta: float) -> void:
@@ -129,7 +129,7 @@ func is_loading() -> bool:
 
 ## Start a new game.
 func start_new_game() -> void:
-	Logger.info("GameManager", "Starting new game")
+	GameLogger.info("GameManager", "Starting new game")
 
 	_transition_to_state(GameState.LOADING)
 
@@ -148,7 +148,7 @@ func start_new_game() -> void:
 ## Load a saved game.
 ## @param slot The save slot to load
 func load_saved_game(slot: int = 0) -> void:
-	Logger.info("GameManager", "Loading saved game from slot %d" % slot)
+	GameLogger.info("GameManager", "Loading saved game from slot %d" % slot)
 
 	_transition_to_state(GameState.LOADING)
 
@@ -158,7 +158,7 @@ func load_saved_game(slot: int = 0) -> void:
 		_transition_to_state(GameState.PLAYING)
 	else:
 		# Return to menu on failed load
-		Logger.error("GameManager", "Failed to load game, returning to menu")
+		GameLogger.error("GameManager", "Failed to load game, returning to menu")
 		_transition_to_state(GameState.MENU)
 
 
@@ -166,7 +166,7 @@ func load_saved_game(slot: int = 0) -> void:
 func continue_game() -> void:
 	var saves := SaveManager.get_all_save_info()
 	if saves.is_empty():
-		Logger.warn("GameManager", "No saves found to continue")
+		GameLogger.warn("GameManager", "No saves found to continue")
 		return
 
 	# Find most recent save
@@ -183,7 +183,7 @@ func pause_game() -> void:
 	if _state != GameState.PLAYING:
 		return
 
-	Logger.info("GameManager", "Game paused")
+	GameLogger.info("GameManager", "Game paused")
 
 	_previous_state = _state
 	_pre_pause_time_scale = _time_scale
@@ -201,7 +201,7 @@ func resume_game() -> void:
 	if _state != GameState.PAUSED:
 		return
 
-	Logger.info("GameManager", "Game resumed")
+	GameLogger.info("GameManager", "Game resumed")
 
 	# Restore time scale
 	_time_scale = _pre_pause_time_scale
@@ -224,7 +224,7 @@ func toggle_pause() -> void:
 
 ## Return to main menu.
 func return_to_menu() -> void:
-	Logger.info("GameManager", "Returning to main menu")
+	GameLogger.info("GameManager", "Returning to main menu")
 
 	# Unpause if paused
 	if _state == GameState.PAUSED:
@@ -240,7 +240,7 @@ func return_to_menu() -> void:
 
 ## Quit the game.
 func quit_game() -> void:
-	Logger.info("GameManager", "Quitting game")
+	GameLogger.info("GameManager", "Quitting game")
 
 	EventBus.game_quitting.emit()
 
@@ -264,7 +264,7 @@ func get_time_scale() -> float:
 func set_time_scale(scale: float) -> void:
 	_time_scale = clampf(scale, 0.0, 4.0)
 	Engine.time_scale = _time_scale
-	Logger.debug("GameManager", "Time scale set to %.2f" % _time_scale)
+	GameLogger.debug("GameManager", "Time scale set to %.2f" % _time_scale)
 
 
 ## Get total playtime in seconds.
@@ -288,7 +288,7 @@ func get_playtime_formatted() -> String:
 ## Reset game to a safe state after critical error.
 ## Called by ErrorHandler during recovery.
 func reset_to_safe_state() -> void:
-	Logger.warn("GameManager", "Resetting to safe state")
+	GameLogger.warn("GameManager", "Resetting to safe state")
 
 	# Unpause if paused
 	if _state == GameState.PAUSED:
@@ -314,7 +314,7 @@ func _transition_to_state(new_state: GameState) -> void:
 	var old_state := _state
 	_state = new_state
 
-	Logger.info("GameManager", "State: %s -> %s" % [
+	GameLogger.info("GameManager", "State: %s -> %s" % [
 		GameState.keys()[old_state],
 		GameState.keys()[new_state]
 	])
@@ -322,7 +322,7 @@ func _transition_to_state(new_state: GameState) -> void:
 
 ## Handle critical error from ErrorHandler.
 func _on_critical_error(system: String, message: String) -> void:
-	Logger.error("GameManager", "Critical error in %s: %s" % [system, message])
+	GameLogger.error("GameManager", "Critical error in %s: %s" % [system, message])
 
 	# Pause game during error handling
 	if _state == GameState.PLAYING:
@@ -337,7 +337,7 @@ func _on_critical_error(system: String, message: String) -> void:
 ## Emits EventBus.scene_loading before transition and EventBus.scene_loaded after.
 ## Uses deferred scene change for safety.
 func change_to_game_scene() -> void:
-	Logger.info("GameManager", "Transitioning to game scene")
+	GameLogger.info("GameManager", "Transitioning to game scene")
 	_change_scene(GAME_SCENE_PATH)
 
 
@@ -345,7 +345,7 @@ func change_to_game_scene() -> void:
 ## Emits EventBus.scene_loading before transition and EventBus.scene_loaded after.
 ## Uses deferred scene change for safety.
 func change_to_main_scene() -> void:
-	Logger.info("GameManager", "Transitioning to main scene")
+	GameLogger.info("GameManager", "Transitioning to main scene")
 	_change_scene(MAIN_SCENE_PATH)
 
 
@@ -377,7 +377,7 @@ func _do_scene_change(scene_path: String) -> void:
 	var err := get_tree().change_scene_to_file(scene_path)
 
 	if err != OK:
-		Logger.error("GameManager", "Failed to change scene to %s: error code %d" % [scene_path, err])
+		GameLogger.error("GameManager", "Failed to change scene to %s: error code %d" % [scene_path, err])
 		ErrorHandler.handle_error("Scene", "Failed to load scene: " + scene_path, false)
 
 		# Attempt recovery - stay in current scene
@@ -396,4 +396,4 @@ func _do_scene_change(scene_path: String) -> void:
 	else:
 		_transition_to_state(GameState.MENU)
 
-	Logger.info("GameManager", "Scene loaded: %s" % scene_name)
+	GameLogger.info("GameManager", "Scene loaded: %s" % scene_name)
