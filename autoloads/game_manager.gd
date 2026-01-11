@@ -6,8 +6,19 @@
 ## Source: game-architecture.md#State Management
 ##
 ## Controls game state, pause, time scale, and coordinates other systems.
+## Story 0.5: Added scene transition methods (change_to_game_scene, change_to_main_scene)
 class_name GameManager
 extends Node
+
+# =============================================================================
+# SCENE PATHS
+# =============================================================================
+
+## Path to the main menu/title scene
+const MAIN_SCENE_PATH := "res://scenes/main.tscn"
+
+## Path to the gameplay scene
+const GAME_SCENE_PATH := "res://scenes/game.tscn"
 
 # =============================================================================
 # GAME STATE
@@ -223,10 +234,8 @@ func return_to_menu() -> void:
 	if _state == GameState.PLAYING or _state == GameState.PAUSED:
 		SaveManager.quick_save()
 
-	_transition_to_state(GameState.MENU)
-
-	# Change to main menu scene
-	# get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	# Change to main scene using scene transition system (Story 0.5)
+	change_to_main_scene()
 
 
 ## Quit the game.
@@ -318,3 +327,73 @@ func _on_critical_error(system: String, message: String) -> void:
 	# Pause game during error handling
 	if _state == GameState.PLAYING:
 		pause_game()
+
+
+# =============================================================================
+# SCENE TRANSITIONS (Story 0.5)
+# =============================================================================
+
+## Change to the game scene.
+## Emits EventBus.scene_loading before transition and EventBus.scene_loaded after.
+## Uses deferred scene change for safety.
+func change_to_game_scene() -> void:
+	Logger.info("GameManager", "Transitioning to game scene")
+	_change_scene(GAME_SCENE_PATH)
+
+
+## Change to the main/menu scene.
+## Emits EventBus.scene_loading before transition and EventBus.scene_loaded after.
+## Uses deferred scene change for safety.
+func change_to_main_scene() -> void:
+	Logger.info("GameManager", "Transitioning to main scene")
+	_change_scene(MAIN_SCENE_PATH)
+
+
+## Internal scene change with error handling and EventBus integration.
+## @param scene_path The path to the scene file to load
+func _change_scene(scene_path: String) -> void:
+	# Transition to loading state
+	_transition_to_state(GameState.LOADING)
+
+	# Use call_deferred for safer scene transition
+	# Signals are emitted inside deferred call to ensure proper timing
+	call_deferred("_do_scene_change", scene_path)
+
+
+## Deferred scene change execution.
+## Called via call_deferred to ensure safe timing.
+## Emits signals at proper lifecycle points.
+## @param scene_path The path to load
+func _do_scene_change(scene_path: String) -> void:
+	# Emit scene loading signal at start of transition
+	EventBus.scene_loading.emit(scene_path)
+
+	# Notify current scene it's being unloaded
+	var current_scene := get_tree().current_scene
+	if current_scene != null:
+		EventBus.scene_unloading.emit(current_scene.name)
+
+	# Perform actual scene change
+	var err := get_tree().change_scene_to_file(scene_path)
+
+	if err != OK:
+		Logger.error("GameManager", "Failed to change scene to %s: error code %d" % [scene_path, err])
+		ErrorHandler.handle_error("Scene", "Failed to load scene: " + scene_path, false)
+
+		# Attempt recovery - stay in current scene
+		_transition_to_state(GameState.MENU)
+		return
+
+	# Extract scene name from path for logging
+	var scene_name := scene_path.get_file().get_basename()
+
+	# Emit scene loaded signal (scene is now ready)
+	EventBus.scene_loaded.emit(scene_name)
+
+	# Transition state based on which scene loaded
+	if scene_path == GAME_SCENE_PATH:
+		_transition_to_state(GameState.PLAYING)
+	else:
+		_transition_to_state(GameState.MENU)
+
+	Logger.info("GameManager", "Scene loaded: %s" % scene_name)

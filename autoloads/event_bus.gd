@@ -259,3 +259,26 @@ signal tutorial_hint_dismissed(hint_id: String)
 ## @param setting_name The name of the changed setting
 ## @param new_value The new value
 signal setting_changed(setting_name: String, new_value: Variant)
+
+# =============================================================================
+# SCENE LIFECYCLE EVENTS
+# =============================================================================
+
+## Emitted when a scene transition is starting.
+## @param scene_path The path of the scene being loaded
+signal scene_loading(scene_path: String)
+
+## Emitted when a scene has fully loaded and is ready.
+## @param scene_name The name of the loaded scene
+signal scene_loaded(scene_name: String)
+
+## Emitted when a scene is about to be unloaded.
+## @param scene_name The name of the scene being unloaded
+signal scene_unloading(scene_name: String)
+
+## Emitted when all autoloads have been verified as ready.
+signal autoloads_ready()
+
+## Emitted when autoload verification fails.
+## @param missing_autoloads Array of autoload names that are missing
+signal autoloads_failed(missing_autoloads: Array)
