@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=3 uid="uid://b7yx2nq4wkr6y"]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="Script" path="res://scripts/world/world_manager.gd" id="2_world_manager"]
+[ext_resource type="Script" path="res://scripts/camera/camera_controller.gd" id="3_camera_controller"]
+
+[node name="Game" type="Node"]
+script = ExtResource("1_game")
+
+[node name="World" type="Node2D" parent="."]
+script = ExtResource("2_world_manager")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Camera" type="Camera2D" parent="."]
+position = Vector2(0, 0)
+zoom = Vector2(0.8, 0.8)
+position_smoothing_enabled = true
+position_smoothing_speed = 5.0
+
+[node name="CameraController" type="Node" parent="Camera"]
+script = ExtResource("3_camera_controller")

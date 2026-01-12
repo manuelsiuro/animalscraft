@@ -33,6 +33,7 @@ extends Node
 @onready var world: WorldManager = $World
 @onready var ui: CanvasLayer = $UI
 @onready var camera: Camera2D = $Camera
+@onready var camera_controller: CameraController = $Camera/CameraController
 
 
 ## Track if scene has been fully initialized
@@ -58,6 +59,9 @@ func _ready() -> void:
 
 	# Configure Camera2D for game viewport
 	_configure_camera()
+
+	# Initialize camera controller with world manager (Story 1.3)
+	_initialize_camera_controller()
 
 	# Mark as initialized
 	_initialized = true
@@ -168,6 +172,25 @@ func _configure_camera() -> void:
 
 	if is_instance_valid(GameLogger):
 		GameLogger.debug("Game", "Camera configured: zoom=%.1f, limits set, smoothing enabled" % camera.zoom.x)
+
+
+## Initialize camera controller with world manager reference
+## Story 1.3: Camera pan requires world bounds for clamping
+func _initialize_camera_controller() -> void:
+	# AR18: Null safety guard
+	if not camera_controller:
+		push_warning("[Game] CameraController missing - camera pan will not work")
+		return
+
+	if not world:
+		push_warning("[Game] World missing - camera bounds cannot be calculated")
+		return
+
+	# Initialize camera controller with world manager reference
+	camera_controller.initialize(world)
+
+	if is_instance_valid(GameLogger):
+		GameLogger.info("Game", "CameraController initialized with world bounds")
 
 
 ## Handle game pause event
