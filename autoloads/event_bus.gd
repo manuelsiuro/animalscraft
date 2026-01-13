@@ -232,6 +232,18 @@ signal building_placed(building: Node, hex_coord: Vector2i)
 signal building_removed(building: Node)
 
 # =============================================================================
+# CAMERA EVENTS
+# =============================================================================
+
+## Emitted when camera zoom level changes.
+## @param zoom_height The new camera Y height (lower = zoomed in, higher = zoomed out)
+signal camera_zoomed(zoom_height: float)
+
+## Emitted when camera position changes via pan.
+## @param position The new camera position (Vector3 with X, Y, Z)
+signal camera_panned(position: Vector3)
+
+# =============================================================================
 # UI EVENTS
 # =============================================================================
 
