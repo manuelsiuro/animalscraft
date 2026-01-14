@@ -152,8 +152,10 @@ func _play_selection_juice() -> void:
 
 	# Play selection SFX (placeholder - unique per animal type in future)
 	# Uses play_ui_sfx which constructs path: res://assets/audio/sfx/sfx_ui_{name}.ogg
-	if AudioManager and AudioManager.has_method("play_ui_sfx"):
-		AudioManager.play_ui_sfx("select")  # Placeholder chirp
+	# Check file exists to avoid log spam until audio assets are created (Code Review fix)
+	var sfx_path := "res://assets/audio/sfx/sfx_ui_select.ogg"
+	if ResourceLoader.exists(sfx_path) and AudioManager and AudioManager.has_method("play_ui_sfx"):
+		AudioManager.play_ui_sfx("select")
 
 
 func _on_selection_changed(is_selected_state: bool) -> void:

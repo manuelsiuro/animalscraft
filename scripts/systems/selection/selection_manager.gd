@@ -49,6 +49,12 @@ func _find_camera() -> void:
 		GameLogger.warn("Selection", "No camera found - selection may not work correctly")
 
 
+## Refresh camera reference. Call this after camera changes (e.g., cutscenes).
+## Code Review fix: Addresses stale camera reference issue.
+func refresh_camera() -> void:
+	_find_camera()
+
+
 ## CRITICAL: Use _input() NOT _unhandled_input() to guarantee priority over camera.
 ## This ensures selection always processes taps before camera pan/zoom.
 func _input(event: InputEvent) -> void:
@@ -108,8 +114,11 @@ func _handle_tap(screen_pos: Vector2) -> void:
 
 
 func _screen_to_world(screen_pos: Vector2) -> Vector3:
-	if not _camera:
-		return Vector3.ZERO
+	# Auto-refresh camera if it became invalid (Code Review fix)
+	if not _camera or not is_instance_valid(_camera):
+		_find_camera()
+		if not _camera:
+			return Vector3.ZERO
 
 	# Raycast from camera to Y=0 plane
 	var ray_origin := _camera.project_ray_origin(screen_pos)

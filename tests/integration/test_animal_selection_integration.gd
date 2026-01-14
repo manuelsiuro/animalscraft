@@ -281,3 +281,73 @@ func test_rapid_same_animal_selection() -> void:
 
 	# Should only have emitted one select signal
 	assert_signal_emit_count(EventBus, "animal_selected", 1)
+
+# =============================================================================
+# SELECTION DURING CAMERA MOMENTUM TESTS (Task 8.10 - Code Review fix)
+# =============================================================================
+
+func test_selection_during_camera_momentum() -> void:
+	## Test that selection works while camera has active momentum (AC5)
+	## This verifies momentum does not interfere with tap detection
+
+	# Create a mock camera controller with momentum
+	var camera := Camera3D.new()
+	camera.add_to_group("cameras")
+	add_child(camera)
+	await wait_frames(1)
+
+	var CameraControllerScript := preload("res://scripts/camera/camera_controller.gd")
+	var camera_controller := CameraControllerScript.new()
+	camera.add_child(camera_controller)
+	await wait_frames(1)
+
+	# Simulate camera momentum (set internal state)
+	camera_controller._momentum_velocity = Vector2(50.0, 30.0)  # Active momentum
+
+	# Verify momentum is active
+	assert_gt(camera_controller._momentum_velocity.length(), 0.5, "Camera should have active momentum")
+
+	# Now select an animal while camera has momentum
+	selection_manager.select_animal(animal)
+
+	# Selection should succeed despite camera momentum
+	assert_true(selection_manager.has_selection(), "Selection should work during camera momentum")
+	assert_eq(selection_manager.get_selected_animal(), animal, "Correct animal should be selected")
+	assert_true(animal.is_selected(), "Animal should report as selected")
+
+	# Cleanup
+	camera.queue_free()
+	await wait_frames(1)
+
+
+func test_selection_clears_during_camera_momentum() -> void:
+	## Test that deselection works while camera has active momentum
+
+	# Create a mock camera with momentum
+	var camera := Camera3D.new()
+	camera.add_to_group("cameras")
+	add_child(camera)
+	await wait_frames(1)
+
+	var CameraControllerScript := preload("res://scripts/camera/camera_controller.gd")
+	var camera_controller := CameraControllerScript.new()
+	camera.add_child(camera_controller)
+	await wait_frames(1)
+
+	# First select the animal
+	selection_manager.select_animal(animal)
+	assert_true(selection_manager.has_selection(), "Should have selection")
+
+	# Simulate camera momentum
+	camera_controller._momentum_velocity = Vector2(100.0, 50.0)
+
+	# Now deselect while camera has momentum
+	selection_manager.deselect_current()
+
+	# Deselection should succeed
+	assert_false(selection_manager.has_selection(), "Deselection should work during camera momentum")
+	assert_false(animal.is_selected(), "Animal should report as deselected")
+
+	# Cleanup
+	camera.queue_free()
+	await wait_frames(1)

@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3 uid="uid://bi7e17bdmd70e"]
+[gd_scene load_steps=6 format=3 uid="uid://bi7e17bdmd70e"]
 
 [ext_resource type="Script" uid="uid://8oy57wwaggvh" path="res://scripts/game.gd" id="1"]
 [ext_resource type="Script" uid="uid://b30xd54sjhbdr" path="res://scripts/world/world_manager.gd" id="2_lnu2h"]
 [ext_resource type="Script" uid="uid://bkipsn4m1354m" path="res://scripts/camera/camera_controller.gd" id="3"]
+[ext_resource type="PackedScene" uid="uid://cj7e8fk9m2q4l" path="res://scenes/ui/animal_stats_panel.tscn" id="4_stats_panel"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -18,6 +19,8 @@ script = ExtResource("1")
 script = ExtResource("2_lnu2h")
 
 [node name="UI" type="CanvasLayer" parent="."]
+
+[node name="AnimalStatsPanel" parent="UI" instance=ExtResource("4_stats_panel")]
 
 [node name="Camera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 50, 30)
