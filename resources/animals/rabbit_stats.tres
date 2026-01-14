@@ -8,5 +8,5 @@ animal_id = "rabbit"
 energy = 3
 speed = 4
 strength = 2
-specialty = "Fast gatherer"
+specialty = "Speed +20% gathering"
 biome = "plains"

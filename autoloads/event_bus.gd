@@ -197,6 +197,15 @@ signal production_halted(building: Node, reason: String)
 # ANIMAL EVENTS
 # =============================================================================
 
+## Emitted when an animal's energy reaches zero.
+## @param animal The Animal node whose energy is depleted
+signal animal_energy_depleted(animal: Node)
+
+## Emitted when an animal's mood changes.
+## @param animal The Animal node whose mood changed
+## @param mood The new mood as a string ("happy", "neutral", "sad")
+signal animal_mood_changed(animal: Node, mood: String)
+
 ## Emitted when an animal is spawned.
 ## @param animal The Animal node that was spawned
 signal animal_spawned(animal: Node)

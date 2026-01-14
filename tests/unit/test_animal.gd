@@ -259,3 +259,95 @@ func test_stats_component_initialized_with_animal_stats() -> void:
 	if stats_comp.has_method("get_base_stats"):
 		var base_stats: AnimalStats = stats_comp.get_base_stats()
 		assert_eq(base_stats, mock_stats, "StatsComponent should have animal's stats")
+
+
+# =============================================================================
+# STATS COMPONENT INTEGRATION TESTS (Story 2-2, Task 9)
+# =============================================================================
+
+func test_stats_component_is_initialized_after_animal_init() -> void:
+	## AC2: Stats loaded from AnimalStats resource via Animal.initialize()
+	animal.initialize(mock_hex, mock_stats)
+
+	var stats_comp: StatsComponent = animal.get_node("StatsComponent") as StatsComponent
+	assert_true(stats_comp.is_initialized(), "StatsComponent should be initialized after Animal.initialize()")
+
+
+func test_stats_component_energy_accessible_through_animal() -> void:
+	## AC5: Energy management works through animal integration
+	animal.initialize(mock_hex, mock_stats)
+
+	var stats_comp: StatsComponent = animal.get_node("StatsComponent") as StatsComponent
+	assert_eq(stats_comp.get_energy(), 3, "Energy should be initialized from mock_stats")
+	assert_eq(stats_comp.get_max_energy(), 3, "Max energy should match resource")
+
+
+func test_stats_component_energy_persists_through_operations() -> void:
+	## AC4: Runtime stats separate from base stats
+	animal.initialize(mock_hex, mock_stats)
+
+	var stats_comp: StatsComponent = animal.get_node("StatsComponent") as StatsComponent
+	stats_comp.deplete_energy(1)
+
+	# Runtime changed but base should not
+	assert_eq(stats_comp.get_energy(), 2, "Runtime energy should be depleted")
+	assert_eq(mock_stats.energy, 3, "Base stats resource should be unchanged")
+
+
+func test_stats_component_mood_works_through_animal() -> void:
+	## AC6: Mood system integration with Animal
+	animal.initialize(mock_hex, mock_stats)
+
+	var stats_comp: StatsComponent = animal.get_node("StatsComponent") as StatsComponent
+	assert_eq(stats_comp.get_mood(), StatsComponent.Mood.HAPPY, "Default mood should be HAPPY")
+
+	stats_comp.decrease_mood()
+	assert_eq(stats_comp.get_mood(), StatsComponent.Mood.NEUTRAL, "Mood should decrease to NEUTRAL")
+
+
+func test_stats_component_effective_stats_with_mood() -> void:
+	## AC7: Effective stats affected by mood
+	animal.initialize(mock_hex, mock_stats)
+
+	var stats_comp: StatsComponent = animal.get_node("StatsComponent") as StatsComponent
+
+	# Happy mood = full effectiveness (1.0)
+	assert_almost_eq(stats_comp.get_effective_speed(), 4.0, 0.01, "Happy speed should be full")
+
+	# Sad mood = reduced effectiveness (0.7)
+	stats_comp.set_mood(StatsComponent.Mood.SAD)
+	assert_almost_eq(stats_comp.get_effective_speed(), 2.8, 0.01, "Sad speed should be 4 * 0.7 = 2.8")
+
+
+func test_eventbus_signals_emitted_through_animal() -> void:
+	## AC8: EventBus signals work with Animal as parent
+	animal.initialize(mock_hex, mock_stats)
+	watch_signals(EventBus)
+
+	var stats_comp: StatsComponent = animal.get_node("StatsComponent") as StatsComponent
+	stats_comp.set_mood(StatsComponent.Mood.NEUTRAL)
+
+	assert_signal_emitted(EventBus, "animal_mood_changed")
+
+	# Check the signal includes the correct animal reference
+	var params: Array = get_signal_parameters(EventBus, "animal_mood_changed")
+	assert_eq(params[0], animal, "Signal should reference the animal")
+	assert_eq(params[1], "neutral", "Signal should include mood string")
+
+
+func test_stats_persist_through_animal_lifecycle() -> void:
+	## Task 9.2: Stats persistence through animal lifecycle
+	animal.initialize(mock_hex, mock_stats)
+
+	var stats_comp: StatsComponent = animal.get_node("StatsComponent") as StatsComponent
+
+	# Make changes to runtime stats
+	stats_comp.deplete_energy(2)
+	stats_comp.set_mood(StatsComponent.Mood.SAD)
+
+	# Verify changes persist
+	assert_eq(stats_comp.get_energy(), 1, "Energy changes should persist")
+	assert_eq(stats_comp.get_mood(), StatsComponent.Mood.SAD, "Mood changes should persist")
+
+	# Verify base stats unchanged (read-only pattern)
+	assert_eq(stats_comp.get_base_stats().energy, 3, "Base stats should remain unchanged")

@@ -145,7 +145,7 @@ func test_rabbit_stats_has_expected_values() -> void:
 		assert_eq(loaded_stats.energy, 3, "Rabbit energy should be 3")
 		assert_eq(loaded_stats.speed, 4, "Rabbit speed should be 4")
 		assert_eq(loaded_stats.strength, 2, "Rabbit strength should be 2")
-		assert_eq(loaded_stats.specialty, "Fast gatherer", "Rabbit should be fast gatherer")
+		assert_eq(loaded_stats.specialty, "Speed +20% gathering", "Rabbit specialty per AC3")
 	else:
 		fail_test("Failed to load rabbit_stats.tres")
 
