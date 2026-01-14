@@ -7,6 +7,7 @@
 ##
 ## Controls game state, pause, time scale, and coordinates other systems.
 ## Story 0.5: Added scene transition methods (change_to_game_scene, change_to_main_scene)
+## Story 1.7: Added auto-pause on app switch with Android support (PAUSED/RESUMED notifications)
 ## NOTE: No class_name to avoid conflict with autoload singleton
 extends Node
 
@@ -80,15 +81,29 @@ func _process(delta: float) -> void:
 		_session_playtime += delta
 
 
+## Handle application notifications for pause/resume (Story 1.7).
+## Called by Godot engine for app lifecycle events.
+## Supports both desktop (FOCUS_*) and Android (APPLICATION_*) notifications.
 func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_APPLICATION_FOCUS_OUT:
-			# Pause when app loses focus (mobile)
-			if _state == GameState.PLAYING:
-				pause_game()
+			# Desktop: Window loses focus
+			# Mobile: App goes to background
+			_handle_app_pause()
+
 		NOTIFICATION_APPLICATION_FOCUS_IN:
-			# Don't auto-resume - let player choose
-			pass
+			# Desktop: Window gains focus
+			# Mobile: App returns to foreground
+			_handle_app_resume()
+
+		NOTIFICATION_APPLICATION_PAUSED:
+			# Android only: App paused (more reliable on Android)
+			_handle_app_pause()
+
+		NOTIFICATION_APPLICATION_RESUMED:
+			# Android only: App resumed (more reliable on Android)
+			_handle_app_resume()
+
 		NOTIFICATION_WM_CLOSE_REQUEST:
 			# Cleanup before quitting
 			EventBus.game_quitting.emit()
@@ -397,3 +412,27 @@ func _do_scene_change(scene_path: String) -> void:
 		_transition_to_state(GameState.MENU)
 
 	GameLogger.info("GameManager", "Scene loaded: %s" % scene_name)
+
+
+# =============================================================================
+# APP LIFECYCLE (Story 1.7)
+# =============================================================================
+
+## Handle app going to background/losing focus (Story 1.7).
+## Called by _notification() on FOCUS_OUT or APPLICATION_PAUSED.
+## Only pauses if currently playing - safe to call multiple times.
+func _handle_app_pause() -> void:
+	# Only pause if we're actually playing
+	if _state == GameState.PLAYING:
+		GameLogger.debug("GameManager", "App focus lost - pausing game")
+		pause_game()
+
+
+## Handle app returning to foreground/gaining focus (Story 1.7).
+## Called by _notification() on FOCUS_IN or APPLICATION_RESUMED.
+## Auto-resumes if currently paused - safe to call multiple times.
+func _handle_app_resume() -> void:
+	# Only resume if we're paused
+	if _state == GameState.PAUSED:
+		GameLogger.debug("GameManager", "App focus regained - resuming game")
+		resume_game()

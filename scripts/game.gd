@@ -10,9 +10,9 @@
 ## - Follows AR11 graceful error handling and AR18 null safety patterns
 ##
 ## Child Node Structure:
-## - World (Node2D): Contains hex grid, entities, and game state (Epic 1+)
+## - World (Node3D): Contains hex grid, entities, and game state (Epic 1+)
 ## - UI (CanvasLayer): HUD, menus, and player interaction (Epic 2+)
-## - Camera (Camera2D): Pan/zoom controls and viewport management (Epic 1)
+## - Camera (Camera3D): Pan/zoom controls and viewport management (Epic 1)
 ##
 ## Story 0.5 Additions:
 ## - EventBus connections for scene lifecycle events
@@ -32,7 +32,7 @@ extends Node
 ## References to core subsystem nodes
 @onready var world: WorldManager = $World
 @onready var ui: CanvasLayer = $UI
-@onready var camera: Camera2D = $Camera
+@onready var camera: Camera3D = $Camera
 @onready var camera_controller: CameraController = $Camera/CameraController
 
 
@@ -57,7 +57,7 @@ func _ready() -> void:
 	# Connect to EventBus lifecycle signals (Story 0.5)
 	_connect_eventbus_signals()
 
-	# Configure Camera2D for game viewport
+	# Configure Camera3D for game viewport
 	_configure_camera()
 
 	# Initialize camera controller with world manager (Story 1.3)
@@ -142,7 +142,7 @@ func _disconnect_eventbus_signals() -> void:
 		EventBus.game_resumed.disconnect(_on_game_resumed)
 
 
-## Configure Camera2D for mobile portrait viewport
+## Configure Camera3D for mobile portrait viewport
 func _configure_camera() -> void:
 	# AR18: Null safety guard
 	if not camera:
@@ -151,27 +151,16 @@ func _configure_camera() -> void:
 	# Set camera as current for this scene
 	camera.make_current()
 
-	# Configure for 1080x1920 portrait
-	camera.position = Vector2.ZERO
+	# Camera3D is positioned in game.tscn at (0, 50, 30) with isometric rotation
+	# Position: Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 50, 30)
+	# This provides ~45° isometric view of the game world
 
-	# Set initial zoom level for portrait mode
-	# Zoom out slightly to show more of the game world
-	camera.zoom = Vector2(0.8, 0.8)
-
-	# Set camera limits to prevent panning off-screen
-	# These will be updated dynamically when world size is known (Story 1.1)
-	# For now, set reasonable defaults
-	camera.limit_left = -500
-	camera.limit_right = 500
-	camera.limit_top = -1000
-	camera.limit_bottom = 1000
-
-	# Enable camera smoothing for better feel
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 5.0
+	# TODO (Story 1-3): Implement camera pan (X/Z translation)
+	# TODO (Story 1-4): Implement camera zoom (distance adjustment via position.y)
+	# For now, camera configuration is handled by game.tscn
 
 	if is_instance_valid(GameLogger):
-		GameLogger.debug("Game", "Camera configured: zoom=%.1f, limits set, smoothing enabled" % camera.zoom.x)
+		GameLogger.debug("Game", "Camera3D configured at position (%f, %f, %f)" % [camera.position.x, camera.position.y, camera.position.z])
 
 
 ## Initialize camera controller with world manager reference
@@ -229,5 +218,5 @@ func get_ui() -> CanvasLayer:
 
 ## Get reference to Camera node for external access
 ## @return Camera node or null if not available
-func get_camera() -> Camera2D:
+func get_camera() -> Camera3D:
 	return camera

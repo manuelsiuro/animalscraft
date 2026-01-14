@@ -141,17 +141,17 @@ func test_game_scene_node_types() -> void:
 	var game_scene := load("res://scenes/game.tscn") as PackedScene
 	var game_instance := game_scene.instantiate()
 
-	# World should be Node2D
+	# World should be Node3D (3D world in Story 1-0 rework)
 	var world := game_instance.get_node_or_null("World")
-	assert_true(world is Node2D, "World should be Node2D")
+	assert_true(world is Node3D, "World should be Node3D")
 
 	# UI should be CanvasLayer
 	var ui := game_instance.get_node_or_null("UI")
 	assert_true(ui is CanvasLayer, "UI should be CanvasLayer")
 
-	# Camera should be Camera2D
+	# Camera should be Camera3D
 	var camera := game_instance.get_node_or_null("Camera")
-	assert_true(camera is Camera2D, "Camera should be Camera2D")
+	assert_true(camera is Camera3D, "Camera should be Camera3D")
 
 	game_instance.free()
 

@@ -318,8 +318,8 @@ func test_get_world_bounds() -> void:
 
 	var bounds := _manager.get_world_bounds()
 
-	assert_true(bounds.size.x > 0, "Bounds width should be > 0")
-	assert_true(bounds.size.y > 0, "Bounds height should be > 0")
+	assert_true(bounds.size.x > 0, "Bounds width (X) should be > 0")
+	assert_true(bounds.size.z > 0, "Bounds depth (Z) should be > 0")
 
 
 ## Test world bounds contains all tiles
@@ -331,7 +331,7 @@ func test_world_bounds_contains_all_tiles() -> void:
 	for tile in _manager.get_all_tiles():
 		var pos := tile.position
 		assert_true(bounds.has_point(pos),
-			"Bounds should contain tile at (%f, %f)" % [pos.x, pos.y])
+			"Bounds should contain tile at (%f, %f, %f)" % [pos.x, pos.y, pos.z])
 
 # =============================================================================
 # EDGE CASE TESTS

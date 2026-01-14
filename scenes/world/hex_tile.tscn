@@ -2,9 +2,12 @@
 
 [ext_resource type="Script" path="res://scripts/world/hex_tile.gd" id="1_hex_tile"]
 
-[node name="HexTile" type="Node2D"]
+[node name="HexTile" type="Node3D"]
 script = ExtResource("1_hex_tile")
 
-[node name="Polygon2D" type="Polygon2D" parent="."]
-color = Color(0.486, 0.729, 0.373, 1)
-polygon = PackedVector2Array(0, -64, 55.43, -32, 55.43, 32, 0, 64, -55.43, 32, -55.43, -32)
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+
+[node name="BorderMesh" type="MeshInstance3D" parent="."]
+
+[node name="FogMesh" type="MeshInstance3D" parent="."]
+visible = false

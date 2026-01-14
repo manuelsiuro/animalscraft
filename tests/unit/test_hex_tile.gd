@@ -98,7 +98,8 @@ func test_get_world_center() -> void:
 	var center := _tile.get_world_center()
 
 	assert_almost_eq(center.x, expected.x, FLOAT_TOLERANCE, "World center x should match position")
-	assert_almost_eq(center.y, expected.y, FLOAT_TOLERANCE, "World center y should match position")
+	assert_almost_eq(center.y, expected.y, FLOAT_TOLERANCE, "World center y should match position (ground level)")
+	assert_almost_eq(center.z, expected.z, FLOAT_TOLERANCE, "World center z should match position")
 
 # =============================================================================
 # AC2: Terrain Type Visual Tests

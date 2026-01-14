@@ -30,6 +30,10 @@ const NON_CRITICAL_AUTOLOADS := ["Settings", "AudioManager", "SaveManager", "Gam
 ## Track if autoloads have been verified
 var _autoloads_verified := false
 
+## Auto-transition timer to game scene after splash screen
+var _transition_timer := 0.0
+const SPLASH_SCREEN_DURATION := 2.0  # seconds to show welcome screen
+
 
 ## Initialize main scene and verify core systems
 ## Implements AR11 error handling and AR18 null safety
@@ -69,6 +73,7 @@ func _ready() -> void:
 	if is_instance_valid(GameLogger):
 		GameLogger.info("Main", "AnimalsCraft v0.1.0 initialized")
 		GameLogger.info("Main", "Project Foundation - Story 0.5 complete")
+		GameLogger.info("Main", "Splash screen will auto-transition to game in %.1f seconds" % SPLASH_SCREEN_DURATION)
 	else:
 		print("[Main] AnimalsCraft v0.1.0 initialized")
 
@@ -144,6 +149,21 @@ func are_autoloads_ready() -> bool:
 	return _autoloads_verified
 
 
+## Process function to handle auto-transition timer
+func _process(delta: float) -> void:
+	# Only count timer if autoloads are ready
+	if not _autoloads_verified:
+		return
+
+	# Increment transition timer
+	_transition_timer += delta
+
+	# Auto-transition to game scene after splash duration
+	if _transition_timer >= SPLASH_SCREEN_DURATION:
+		go_to_game()
+		set_process(false)  # Stop processing after transition
+
+
 ## Request transition to game scene via GameManager.
 ## This is a convenience method for UI elements.
 func go_to_game() -> void:
@@ -151,5 +171,8 @@ func go_to_game() -> void:
 	if not is_instance_valid(GameManager):
 		push_error("[Main] Cannot transition to game - GameManager not available")
 		return
+
+	if is_instance_valid(GameLogger):
+		GameLogger.info("Main", "Transitioning from splash screen to game scene")
 
 	GameManager.change_to_game_scene()

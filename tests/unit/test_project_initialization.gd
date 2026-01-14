@@ -118,7 +118,7 @@ func test_game_scene_has_subsystems() -> void:
 	# Verify World, UI, Camera nodes exist
 	var world: Node = game_instance.get_node_or_null("World")
 	assert_not_null(world, "Game scene should have World node")
-	assert_true(world is Node2D, "World should be Node2D")
+	assert_true(world is Node3D, "World should be Node3D")
 
 	var ui: Node = game_instance.get_node_or_null("UI")
 	assert_not_null(ui, "Game scene should have UI node")
@@ -126,7 +126,7 @@ func test_game_scene_has_subsystems() -> void:
 
 	var camera: Node = game_instance.get_node_or_null("Camera")
 	assert_not_null(camera, "Game scene should have Camera node")
-	assert_true(camera is Camera2D, "Camera should be Camera2D")
+	assert_true(camera is Camera3D, "Camera should be Camera3D")
 
 	# Cleanup
 	game_instance.free()

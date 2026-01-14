@@ -3,9 +3,9 @@
 ##
 ## Architecture: scripts/world/world_manager.gd
 ## Parent: scenes/game.tscn > World node
-## Story: 1-2-render-hex-tiles
+## Story: 1-2-render-hex-tiles (Updated for 3D in Story 1-0 rework)
 class_name WorldManager
-extends Node2D
+extends Node3D
 
 # =============================================================================
 # CONSTANTS
@@ -28,6 +28,12 @@ var _tiles: Dictionary = {}
 ## Track if world has been generated
 var _world_generated := false
 
+## Territory manager for tracking ownership (Story 1.5)
+var _territory_manager: TerritoryManager
+
+## Fog of war manager (Story 1.6)
+var _fog_of_war: FogOfWar
+
 # =============================================================================
 # SIGNALS
 # =============================================================================
@@ -43,8 +49,29 @@ signal tile_added(tile: HexTile)
 # =============================================================================
 
 func _ready() -> void:
+	# Add to group for debug access (Story 1.6)
+	add_to_group("world_managers")
+
+	# Create and add territory manager (Story 1.5)
+	_territory_manager = TerritoryManager.new()
+	_territory_manager.name = "TerritoryManager"
+	add_child(_territory_manager)
+
+	# Create and add fog of war manager (Story 1.6)
+	_fog_of_war = FogOfWar.new()
+	_fog_of_war.name = "FogOfWar"
+	add_child(_fog_of_war)
+
 	# Generate starting area on ready
 	generate_starting_area()
+
+	# Initialize territory manager after world generation (Story 1.5)
+	# Note: Skip _initialize_starting_territory() - FogOfWar will handle it
+	_territory_manager.initialize(self)
+
+	# Initialize fog of war (Story 1.6)
+	# FogOfWar will set up the correct starting fog state
+	_fog_of_war.initialize(self, _territory_manager)
 
 
 # =============================================================================
@@ -198,15 +225,22 @@ func is_world_generated() -> bool:
 	return _world_generated
 
 
+## Get the territory manager (Story 1.5).
+##
+## @return The TerritoryManager instance
+func get_territory_manager() -> TerritoryManager:
+	return _territory_manager
+
+
 # =============================================================================
 # COORDINATE UTILITIES
 # =============================================================================
 
 ## Convert a world position to the nearest tile.
 ##
-## @param world_pos The world position to convert
+## @param world_pos The world position to convert (Vector3 in 3D space)
 ## @return The HexTile at that position, or null if no tile exists
-func get_tile_at_world_pos(world_pos: Vector2) -> HexTile:
+func get_tile_at_world_pos(world_pos: Vector3) -> HexTile:
 	var hex := HexGrid.world_to_hex(world_pos)
 	return get_tile_at(hex)
 
@@ -242,16 +276,16 @@ func generate_test_area(range_val: int) -> void:
 ## Get the world bounds of the current tile area.
 ## Useful for setting camera limits.
 ##
-## @return Rect2 containing all tiles, or reasonable default if no tiles exist
-func get_world_bounds() -> Rect2:
+## @return AABB containing all tiles, or reasonable default if no tiles exist
+func get_world_bounds() -> AABB:
 	# AR18: Handle empty tiles gracefully
 	if _tiles.is_empty():
 		push_warning("[WorldManager] No tiles exist, returning default bounds")
-		# Return reasonable default bounds (1000x2000 for portrait mode)
-		return Rect2(-500, -1000, 1000, 2000)
+		# Return reasonable default bounds (1000x2000 on XZ plane, Y=0 ground level)
+		return AABB(Vector3(-500, 0, -1000), Vector3(1000, 1, 2000))
 
-	var min_pos := Vector2.INF
-	var max_pos := -Vector2.INF
+	var min_pos := Vector3.INF
+	var max_pos := -Vector3.INF
 
 	for vec in _tiles.keys():
 		var hex := HexCoord.from_vector(vec)
@@ -259,7 +293,9 @@ func get_world_bounds() -> Rect2:
 
 		min_pos.x = minf(min_pos.x, bounds.position.x)
 		min_pos.y = minf(min_pos.y, bounds.position.y)
-		max_pos.x = maxf(max_pos.x, bounds.position.x + bounds.size.x)
-		max_pos.y = maxf(max_pos.y, bounds.position.y + bounds.size.y)
+		min_pos.z = minf(min_pos.z, bounds.position.z)
+		max_pos.x = maxf(max_pos.x, bounds.end.x)
+		max_pos.y = maxf(max_pos.y, bounds.end.y)
+		max_pos.z = maxf(max_pos.z, bounds.end.z)
 
-	return Rect2(min_pos, max_pos - min_pos)
+	return AABB(min_pos, max_pos - min_pos)

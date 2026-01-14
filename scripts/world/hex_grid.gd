@@ -19,29 +19,32 @@ const SQRT3: float = 1.7320508075688772
 # COORDINATE CONVERSIONS
 # =============================================================================
 
-## Convert hex coordinate to world position (Vector2).
-## Uses pointy-top orientation formula for portrait mode.
+## Convert hex coordinate to world position (Vector3).
+## Uses pointy-top orientation formula for 3D isometric display.
+## Tiles are positioned on the Y=0 plane (ground level).
 ##
 ## Formula (pointy-top):
 ##   x = size * (sqrt(3) * q + sqrt(3)/2 * r)
-##   y = size * (3/2 * r)
-static func hex_to_world(hex: HexCoord) -> Vector2:
+##   z = size * (3/2 * r)
+##   y = 0 (ground level)
+static func hex_to_world(hex: HexCoord) -> Vector3:
 	var size: float = GameConstants.HEX_SIZE
 	var x: float = size * (SQRT3 * hex.q + SQRT3 / 2.0 * hex.r)
-	var y: float = size * (3.0 / 2.0 * hex.r)
-	return Vector2(x, y)
+	var z: float = size * (3.0 / 2.0 * hex.r)
+	return Vector3(x, 0, z)
 
 
 ## Convert world position to hex coordinate.
 ## Uses pointy-top orientation formula with axial rounding.
+## Accepts Vector3 but only uses x and z (ignoring y).
 ##
 ## Formula (pointy-top):
-##   q = (sqrt(3)/3 * x - 1/3 * y) / size
-##   r = (2/3 * y) / size
-static func world_to_hex(world_pos: Vector2) -> HexCoord:
+##   q = (sqrt(3)/3 * x - 1/3 * z) / size
+##   r = (2/3 * z) / size
+static func world_to_hex(world_pos: Vector3) -> HexCoord:
 	var size: float = GameConstants.HEX_SIZE
-	var q: float = (SQRT3 / 3.0 * world_pos.x - 1.0 / 3.0 * world_pos.y) / size
-	var r: float = (2.0 / 3.0 * world_pos.y) / size
+	var q: float = (SQRT3 / 3.0 * world_pos.x - 1.0 / 3.0 * world_pos.z) / size
+	var r: float = (2.0 / 3.0 * world_pos.z) / size
 	return _axial_round(q, r)
 
 
@@ -134,15 +137,20 @@ static func is_in_bounds(hex: HexCoord, min_q: int, max_q: int, min_r: int, max_
 	return hex.q >= min_q and hex.q <= max_q and hex.r >= min_r and hex.r <= max_r
 
 
-## Get the world-space bounding box for a hex (returns Rect2).
-static func get_hex_bounds(hex: HexCoord) -> Rect2:
+## Get the world-space bounding box for a hex (returns AABB for 3D).
+static func get_hex_bounds(hex: HexCoord) -> AABB:
 	var center := hex_to_world(hex)
 	var size: float = GameConstants.HEX_SIZE
 
 	# For pointy-top hexes:
-	# Width = sqrt(3) * size
-	# Height = 2 * size
+	# Width (X) = sqrt(3) * size
+	# Depth (Z) = 2 * size
+	# Height (Y) = minimal (just ground plane)
 	var width: float = SQRT3 * size
-	var height: float = 2.0 * size
+	var depth: float = 2.0 * size
+	var height: float = 1.0  # Minimal height for ground plane
 
-	return Rect2(center.x - width / 2.0, center.y - height / 2.0, width, height)
+	return AABB(
+		Vector3(center.x - width / 2.0, center.y, center.z - depth / 2.0),
+		Vector3(width, height, depth)
+	)

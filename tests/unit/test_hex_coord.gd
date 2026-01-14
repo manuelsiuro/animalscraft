@@ -99,12 +99,13 @@ func test_hex_coord_to_vector() -> void:
 # AC2: Hex-to-World Conversion Tests (Pointy-Top)
 # =============================================================================
 
-## Test hex_to_world at origin returns Vector2.ZERO
+## Test hex_to_world at origin returns Vector3.ZERO (y=0 for ground plane)
 func test_hex_to_world_origin() -> void:
 	var hex := HexCoord.new(0, 0)
 	var world := HexGrid.hex_to_world(hex)
 	assert_almost_eq(world.x, 0.0, FLOAT_TOLERANCE, "Origin x should be 0")
-	assert_almost_eq(world.y, 0.0, FLOAT_TOLERANCE, "Origin y should be 0")
+	assert_almost_eq(world.y, 0.0, FLOAT_TOLERANCE, "Origin y should be 0 (ground plane)")
+	assert_almost_eq(world.z, 0.0, FLOAT_TOLERANCE, "Origin z should be 0")
 
 
 ## Test hex_to_world uses HEX_SIZE constant
@@ -124,14 +125,14 @@ func test_hex_to_world_uses_hex_size() -> void:
 func test_hex_to_world_positive_r() -> void:
 	# For pointy-top hex at (0, 1):
 	# x = HEX_SIZE * (sqrt(3)/2 * 1) ≈ 64 * 0.866 ≈ 55.42
-	# y = HEX_SIZE * (3/2 * 1) = 64 * 1.5 = 96
+	# z = HEX_SIZE * (3/2 * 1) = 64 * 1.5 = 96 (in 3D, Z is depth, Y is up)
 	var hex := HexCoord.new(0, 1)
 	var world := HexGrid.hex_to_world(hex)
 
 	var expected_x := GameConstants.HEX_SIZE * (sqrt(3) / 2.0)
-	var expected_y := GameConstants.HEX_SIZE * 1.5
+	var expected_z := GameConstants.HEX_SIZE * 1.5
 	assert_almost_eq(world.x, expected_x, FLOAT_TOLERANCE, "x should follow pointy-top formula")
-	assert_almost_eq(world.y, expected_y, FLOAT_TOLERANCE, "y should follow pointy-top formula")
+	assert_almost_eq(world.z, expected_z, FLOAT_TOLERANCE, "z should follow pointy-top formula (3D depth)")
 
 
 ## Test hex_to_world uses pointy-top orientation (not flat-top)
@@ -153,7 +154,7 @@ func test_hex_to_world_pointy_top_orientation() -> void:
 
 ## Test world_to_hex at origin
 func test_world_to_hex_origin() -> void:
-	var world := Vector2.ZERO
+	var world := Vector3.ZERO
 	var hex := HexGrid.world_to_hex(world)
 	assert_eq(hex.q, 0, "Origin world position should map to q=0")
 	assert_eq(hex.r, 0, "Origin world position should map to r=0")
@@ -193,7 +194,7 @@ func test_world_to_hex_roundtrip_large() -> void:
 func test_world_to_hex_rounding() -> void:
 	# Position slightly off-center should round to correct hex
 	var hex_center := HexGrid.hex_to_world(HexCoord.new(3, -2))
-	var offset := Vector2(5.0, 5.0)  # Small offset within hex bounds
+	var offset := Vector3(5.0, 0, 5.0)  # Small offset within hex bounds (y=0 for ground plane)
 	var result := HexGrid.world_to_hex(hex_center + offset)
 
 	assert_eq(result.q, 3, "Should round to nearest hex q")
@@ -536,10 +537,10 @@ func test_get_hex_bounds_size() -> void:
 	var bounds := HexGrid.get_hex_bounds(hex)
 
 	var expected_width := sqrt(3) * GameConstants.HEX_SIZE
-	var expected_height := 2.0 * GameConstants.HEX_SIZE
+	var expected_depth := 2.0 * GameConstants.HEX_SIZE
 
-	assert_almost_eq(bounds.size.x, expected_width, FLOAT_TOLERANCE, "Bounds width should match hex width")
-	assert_almost_eq(bounds.size.y, expected_height, FLOAT_TOLERANCE, "Bounds height should match hex height")
+	assert_almost_eq(bounds.size.x, expected_width, FLOAT_TOLERANCE, "Bounds width (X) should match hex width")
+	assert_almost_eq(bounds.size.z, expected_depth, FLOAT_TOLERANCE, "Bounds depth (Z) should match hex depth")
 
 
 ## Test get_hex_bounds centered on hex position
@@ -548,10 +549,14 @@ func test_get_hex_bounds_centered() -> void:
 	var world_pos := HexGrid.hex_to_world(hex)
 	var bounds := HexGrid.get_hex_bounds(hex)
 
-	var bounds_center := Vector2(bounds.position.x + bounds.size.x / 2.0, bounds.position.y + bounds.size.y / 2.0)
+	# AABB.get_center() returns the center of the bounding box
+	var bounds_center := bounds.get_center()
 
 	assert_almost_eq(bounds_center.x, world_pos.x, FLOAT_TOLERANCE, "Bounds should be centered on hex x")
-	assert_almost_eq(bounds_center.y, world_pos.y, FLOAT_TOLERANCE, "Bounds should be centered on hex y")
+	assert_almost_eq(bounds_center.z, world_pos.z, FLOAT_TOLERANCE, "Bounds should be centered on hex z")
+	# Note: AABB has height=1 (y: 0 to 1), so center.y = 0.5, not 0
+	# We check that bounds.position.y matches ground plane instead
+	assert_almost_eq(bounds.position.y, world_pos.y, FLOAT_TOLERANCE, "Bounds base y should match ground plane")
 
 
 ## Test get_hexes_in_range includes center
