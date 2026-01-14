@@ -4,6 +4,7 @@
 ##
 ## Architecture: scripts/entities/animals/animal.gd
 ## Story: 2-1-create-animal-entity-structure
+## Updated: 2-3-implement-animal-selection (visual feedback, selection signals)
 class_name Animal
 extends Node3D
 
@@ -35,9 +36,16 @@ var _initialized: bool = false
 # =============================================================================
 
 @onready var _visual: Node3D = $Visual
-@onready var _selectable: Node = $SelectableComponent
+@onready var _selectable: SelectableComponent = $SelectableComponent
 @onready var _movement: Node = $MovementComponent
 @onready var _stats_component: Node = $StatsComponent
+
+# =============================================================================
+# SELECTION VISUAL (Story 2-3)
+# =============================================================================
+
+## Selection highlight node (created dynamically)
+var _selection_highlight: MeshInstance3D
 
 # =============================================================================
 # LIFECYCLE
@@ -45,6 +53,7 @@ var _initialized: bool = false
 
 func _ready() -> void:
 	add_to_group("animals")
+	_setup_selection_visual()
 	_setup_components()
 
 
@@ -82,9 +91,78 @@ func initialize(hex: HexCoord, animal_stats: AnimalStats) -> void:
 
 
 func _setup_components() -> void:
-	# Wire up component references
-	# Components are stubs in this story, fully implemented in later stories
-	pass
+	# Wire up component references and connect signals
+
+	# Connect to selectable component signals (Story 2-3)
+	if _selectable:
+		_selectable.selection_changed.connect(_on_selection_changed)
+
+
+func _setup_selection_visual() -> void:
+	# Create selection highlight as child node
+	_selection_highlight = MeshInstance3D.new()
+	_selection_highlight.name = "SelectionHighlight"
+
+	# Create highlight mesh (torus ring around entity)
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.4
+	torus.outer_radius = 0.6
+	torus.rings = 16
+	torus.ring_segments = 32
+	_selection_highlight.mesh = torus
+
+	# Create emissive material for glow effect (high contrast for all terrains)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(1.0, 0.8, 0.2)  # Golden yellow
+	material.emission_enabled = true
+	material.emission = Color(1.0, 0.8, 0.2)
+	material.emission_energy_multiplier = 2.0
+	_selection_highlight.material_override = material
+
+	# Position at entity base (just above ground to avoid z-fighting)
+	_selection_highlight.position.y = 0.05
+	# Rotate to lay flat on ground plane
+	_selection_highlight.rotation_degrees.x = -90
+
+	# Initially hidden
+	_selection_highlight.visible = false
+
+	add_child(_selection_highlight)
+
+
+## Show selection highlight with juice animation
+func show_selection_highlight() -> void:
+	if _selection_highlight:
+		_selection_highlight.visible = true
+	_play_selection_juice()
+
+
+## Hide selection highlight
+func hide_selection_highlight() -> void:
+	if _selection_highlight:
+		_selection_highlight.visible = false
+
+
+## Play selection "juice" - scale pulse + SFX for satisfying feedback (AC8)
+func _play_selection_juice() -> void:
+	# Scale pulse animation (1.0 → 1.1 → 1.0 over 0.2s)
+	var tween := create_tween()
+	tween.tween_property(self, "scale", Vector3(1.1, 1.1, 1.1), 0.1)
+	tween.tween_property(self, "scale", Vector3.ONE, 0.1)
+
+	# Play selection SFX (placeholder - unique per animal type in future)
+	# Uses play_ui_sfx which constructs path: res://assets/audio/sfx/sfx_ui_{name}.ogg
+	if AudioManager and AudioManager.has_method("play_ui_sfx"):
+		AudioManager.play_ui_sfx("select")  # Placeholder chirp
+
+
+func _on_selection_changed(is_selected_state: bool) -> void:
+	if is_selected_state:
+		show_selection_highlight()
+		selected.emit()
+	else:
+		hide_selection_highlight()
+		deselected.emit()
 
 # =============================================================================
 # PUBLIC API
@@ -111,6 +189,13 @@ func get_animal_id() -> String:
 		return stats.animal_id
 	return ""
 
+
+## Check if this animal is currently selected (Story 2-3)
+func is_selected() -> bool:
+	if _selectable:
+		return _selectable.is_selected()
+	return false
+
 # =============================================================================
 # CLEANUP
 # =============================================================================
@@ -126,8 +211,9 @@ func cleanup() -> void:
 	if _initialized:
 		EventBus.animal_removed.emit(self)
 
-	# 3. Disconnect any signals (future stories will add signal connections)
-	# Currently no signals to disconnect
+	# 3. Disconnect signals to prevent orphan connections
+	if _selectable and _selectable.selection_changed.is_connected(_on_selection_changed):
+		_selectable.selection_changed.disconnect(_on_selection_changed)
 
 	# 4. Clear references
 	hex_coord = null

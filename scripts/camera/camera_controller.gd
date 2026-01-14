@@ -348,15 +348,14 @@ func _physics_process(delta: float) -> void:
 
 
 func _is_touching_entity(screen_pos: Vector2) -> bool:
-	"""Check if screen position is touching an interactive entity (Story 1.3 AC5)
+	"""Check if screen position is touching an interactive entity (Story 1.3 AC5, Story 2.3)
 
 	Returns true if touch should be consumed by an entity instead of panning.
-	Currently returns false for all positions since no entities are selectable yet.
+	Checks animals via SelectableComponent's is_position_in_range().
 
-	TODO (Future Stories): Implement entity selection for:
-	- Animals (group: 'animals') - check is_at_position()
-	- Buildings (group: 'buildings') - check collision bounds
-	- Selectable tiles - check tile.is_selectable if property exists
+	NOTE: SelectionManager uses _input() and consumes tap events before CameraController
+	sees them (via set_input_as_handled). This function is a secondary check for pan
+	initialization to avoid starting a pan on an entity.
 	"""
 	# Null safety check
 	if not _camera:
@@ -365,16 +364,28 @@ func _is_touching_entity(screen_pos: Vector2) -> bool:
 	# Convert screen to world position via raycast
 	var world_pos: Vector3 = _screen_to_world(screen_pos)
 
-	# Check for tiles at position (placeholder for future selectability)
+	# Check for animals at position (Story 2-3)
+	var animals := get_tree().get_nodes_in_group("animals")
+	for animal_node in animals:
+		var animal := animal_node as Animal
+		if not is_instance_valid(animal) or not animal.is_initialized():
+			continue
+
+		var selectable := animal.get_node_or_null("SelectableComponent") as SelectableComponent
+		if selectable and selectable.is_position_in_range(world_pos):
+			return true
+
+	# Check for buildings at position (future stories)
+	# var buildings := get_tree().get_nodes_in_group("buildings")
+	# ...
+
+	# Check for selectable tiles (future stories)
 	var hex := HexGrid.world_to_hex(world_pos)
 	if _world_manager and _world_manager.has_method("get_tile_at"):
 		var tile = _world_manager.get_tile_at(hex)
-		if tile:
-			# Tiles are not selectable in current implementation (Story 1.3)
-			# Future: return tile.is_selectable if tile.has_method("is_selectable")
-			pass
+		if tile and tile.has_method("is_selectable") and tile.is_selectable():
+			return true
 
-	# No interactive entities implemented yet - always allow pan
 	return false
 
 

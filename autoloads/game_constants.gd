@@ -140,3 +140,19 @@ const DEBUG_HIDDEN_ACTIVATION_TAPS: int = 3
 
 ## Debug overlay update interval in seconds
 const DEBUG_UPDATE_INTERVAL: float = 0.5
+
+# =============================================================================
+# SELECTION CONSTANTS (Story 2-3)
+# =============================================================================
+
+## Maximum time for a touch to count as a tap (milliseconds)
+## Mobile-friendly default (300ms) accommodates players of all ages
+const TAP_MAX_DURATION_MS: int = 300
+
+## Maximum movement distance for a touch to count as a tap (pixels)
+## Beyond this threshold, the touch is treated as a drag/pan
+const TAP_MAX_DISTANCE_PX: float = 10.0
+
+## Default tap radius for selectable entities (pixels)
+## Used to determine if a tap hits an entity
+const SELECTION_TAP_RADIUS: float = 32.0

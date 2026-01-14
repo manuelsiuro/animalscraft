@@ -27,6 +27,7 @@ Settings="*res://autoloads/settings.gd"
 AudioManager="*res://autoloads/audio_manager.gd"
 SaveManager="*res://autoloads/save_manager.gd"
 GameManager="*res://autoloads/game_manager.gd"
+SelectionManager="*res://scripts/systems/selection/selection_manager.gd"
 
 [display]
 
