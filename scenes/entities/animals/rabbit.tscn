@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3 uid="uid://dxr5pqm2v8nlk"]
+
+[ext_resource type="PackedScene" uid="uid://c2qwvxp8jkr5m" path="res://scenes/entities/animals/animal_base.tscn" id="1_base"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rabbit"]
+albedo_color = Color(0.9, 0.85, 0.8, 1)
+
+[node name="Rabbit" instance=ExtResource("1_base")]
+
+[node name="Placeholder" parent="Visual" index="0"]
+material_override = SubResource("StandardMaterial3D_rabbit")

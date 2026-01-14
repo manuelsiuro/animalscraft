@@ -201,6 +201,10 @@ signal production_halted(building: Node, reason: String)
 ## @param animal The Animal node that was spawned
 signal animal_spawned(animal: Node)
 
+## Emitted when an animal is removed/destroyed.
+## @param animal The Animal node that was removed
+signal animal_removed(animal: Node)
+
 ## Emitted when an animal is assigned to a task.
 ## @param animal The Animal node that was assigned
 ## @param target The target (building or hex coord)
