@@ -34,6 +34,9 @@ var _territory_manager: TerritoryManager
 ## Fog of war manager (Story 1.6)
 var _fog_of_war: FogOfWar
 
+## Pathfinding manager (Story 2.6 - for animal movement)
+var _pathfinding: PathfindingManager
+
 # =============================================================================
 # SIGNALS
 # =============================================================================
@@ -72,6 +75,12 @@ func _ready() -> void:
 	# Initialize fog of war (Story 1.6)
 	# FogOfWar will set up the correct starting fog state
 	_fog_of_war.initialize(self, _territory_manager)
+
+	# Create and initialize pathfinding manager (Story 2.6)
+	_pathfinding = PathfindingManager.new()
+	_pathfinding.name = "PathfindingManager"
+	add_child(_pathfinding)
+	_pathfinding.initialize(self)
 
 
 # =============================================================================
@@ -230,6 +239,13 @@ func is_world_generated() -> bool:
 ## @return The TerritoryManager instance
 func get_territory_manager() -> TerritoryManager:
 	return _territory_manager
+
+
+## Get the pathfinding manager (Story 2.6).
+##
+## @return The PathfindingManager instance
+func get_pathfinding_manager() -> PathfindingManager:
+	return _pathfinding
 
 
 # =============================================================================

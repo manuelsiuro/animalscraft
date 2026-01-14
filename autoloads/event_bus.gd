@@ -231,6 +231,18 @@ signal animal_resting(animal: Node)
 ## @param animal The Animal node that recovered
 signal animal_recovered(animal: Node)
 
+## Emitted when an animal starts moving toward a destination.
+## @param animal The Animal node that started moving
+signal animal_movement_started(animal: Node)
+
+## Emitted when an animal reaches its destination.
+## @param animal The Animal node that completed movement
+signal animal_movement_completed(animal: Node)
+
+## Emitted when an animal's movement is interrupted or cancelled.
+## @param animal The Animal node whose movement was cancelled
+signal animal_movement_cancelled(animal: Node)
+
 # =============================================================================
 # BUILDING EVENTS
 # =============================================================================
