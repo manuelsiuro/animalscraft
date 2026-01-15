@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=2 format=3 uid="uid://dr5kq8np3g2mw"]
+
+[ext_resource type="Script" path="res://scripts/entities/buildings/building_data.gd" id="1_sawmill"]
+
+[resource]
+script = ExtResource("1_sawmill")
+building_id = "sawmill"
+display_name = "Sawmill"
+building_type = 0
+max_workers = 2
+footprint_hexes = Array[Vector2i]([Vector2i(0, 0)])
+production_recipe_id = ""

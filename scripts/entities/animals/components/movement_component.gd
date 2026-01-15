@@ -305,22 +305,29 @@ func _update_movement(delta: float) -> void:
 
 
 ## Calculate movement speed based on stats and mood (AC2)
+## Formula: BASE_SPEED + (effective_speed - BASE_STAT_VALUE) * SPEED_PER_STAT
+## Where effective_speed already includes mood modifier from StatsComponent.
+## Example: Speed stat 4, Sad mood (0.7x) → effective_speed = 2.8
+##          Result: 50 + (2.8 - 1.0) * 20 = 86 units/sec
 func _calculate_speed() -> float:
-	var base: float = BASE_SPEED
+	# Base stat value of 1 is the baseline - stats above 1 add speed, below 1 subtract
+	const BASE_STAT_VALUE: float = 1.0
+	var speed: float = BASE_SPEED
 
 	if _stats:
 		if _stats.has_method("get_effective_speed"):
 			var effective_speed: float = _stats.get_effective_speed()
-			# effective_speed already includes mood modifier
-			base = BASE_SPEED + (effective_speed - 1.0) * SPEED_PER_STAT
+			# effective_speed already includes mood modifier from StatsComponent
+			speed = BASE_SPEED + (effective_speed - BASE_STAT_VALUE) * SPEED_PER_STAT
 		elif _stats.has_method("get_speed"):
+			# Fallback: manually apply mood modifier
 			var speed_stat: int = _stats.get_speed()
 			var mood_modifier: float = 1.0
 			if _stats.has_method("get_mood_modifier"):
 				mood_modifier = _stats.get_mood_modifier()
-			base = (BASE_SPEED + (speed_stat - 1) * SPEED_PER_STAT) * mood_modifier
+			speed = (BASE_SPEED + (speed_stat - BASE_STAT_VALUE) * SPEED_PER_STAT) * mood_modifier
 
-	return maxf(base, 10.0)  # Minimum speed to prevent stuck animals
+	return maxf(speed, 10.0)  # Minimum speed to prevent stuck animals
 
 
 ## Called when a waypoint is reached (AC5)

@@ -1,0 +1,308 @@
+## Building - Base class for all building entities in AnimalsCraft.
+## Follows composition pattern with child component nodes.
+## Buildings are Node3D positioned on the Y=0 ground plane.
+##
+## Architecture: scripts/entities/buildings/building.gd
+## Story: 3-1-create-building-entity-structure
+class_name Building
+extends Node3D
+
+# =============================================================================
+# SIGNALS
+# =============================================================================
+
+## Emitted when building is selected by player
+signal selected()
+
+## Emitted when building is deselected
+signal deselected()
+
+# =============================================================================
+# PROPERTIES
+# =============================================================================
+
+## Current hex coordinate of this building
+var hex_coord: HexCoord
+
+## Data resource for this building type
+var data: BuildingData
+
+## Whether building has been properly initialized
+var _initialized: bool = false
+
+# =============================================================================
+# COMPONENTS (child nodes, assigned in _ready)
+# =============================================================================
+
+@onready var _visual: Node3D = $Visual
+@onready var _selectable: SelectableComponent = $SelectableComponent
+@onready var _worker_slots: WorkerSlotComponent = $WorkerSlotComponent
+
+# =============================================================================
+# SELECTION VISUAL (same pattern as Animal)
+# =============================================================================
+
+## Selection highlight node (created dynamically)
+var _selection_highlight: MeshInstance3D
+
+# =============================================================================
+# LIFECYCLE
+# =============================================================================
+
+func _ready() -> void:
+	add_to_group("buildings")
+	_setup_selection_visual()
+	_setup_components()
+
+
+## Initialize building with hex position and data.
+## Must be called after scene instantiation.
+## @param hex: The hex coordinate to place the building
+## @param building_data: The data resource for this building type
+func initialize(hex: HexCoord, building_data: BuildingData) -> void:
+	if _initialized:
+		GameLogger.warn("Building", "Building already initialized: %s" % (building_data.building_id if building_data else "unknown"))
+		return
+
+	hex_coord = hex
+	data = building_data
+
+	# Position at hex world location
+	if hex:
+		position = HexGrid.hex_to_world(hex)
+	else:
+		GameLogger.warn("Building", "Initialized with null hex coordinate")
+
+	# Initialize worker slots if it exists and has initialize method
+	if _worker_slots and _worker_slots.has_method("initialize"):
+		_worker_slots.initialize(building_data.max_workers if building_data else 0)
+
+	# Mark hex as occupied
+	_mark_hex_occupied()
+
+	_initialized = true
+
+	if building_data:
+		GameLogger.info("Building", "Spawned %s at %s" % [building_data.building_id, hex])
+	else:
+		GameLogger.info("Building", "Spawned building at %s" % hex)
+
+	# Notify other systems
+	EventBus.building_spawned.emit(self)
+
+
+func _setup_components() -> void:
+	# Wire up component references and connect signals
+
+	# Connect to selectable component signals
+	if _selectable:
+		_selectable.selection_changed.connect(_on_selection_changed)
+
+	# Connect to worker slot signals (PARTY MODE feature)
+	if _worker_slots:
+		_worker_slots.worker_added.connect(_on_worker_added)
+		_worker_slots.worker_removed.connect(_on_worker_removed)
+
+
+func _setup_selection_visual() -> void:
+	# Create selection highlight as child node (same as Animal)
+	_selection_highlight = MeshInstance3D.new()
+	_selection_highlight.name = "SelectionHighlight"
+
+	# Create highlight mesh (torus ring around entity)
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.5  # Slightly larger than Animal for buildings
+	torus.outer_radius = 0.7
+	torus.rings = 16
+	torus.ring_segments = 32
+	_selection_highlight.mesh = torus
+
+	# Create emissive material for glow effect (high contrast for all terrains)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(1.0, 0.8, 0.2)  # Golden yellow
+	material.emission_enabled = true
+	material.emission = Color(1.0, 0.8, 0.2)
+	material.emission_energy_multiplier = 2.0
+	_selection_highlight.material_override = material
+
+	# Position at entity base (just above ground to avoid z-fighting)
+	_selection_highlight.position.y = 0.05
+	# Rotate to lay flat on ground plane
+	_selection_highlight.rotation_degrees.x = -90
+
+	# Initially hidden
+	_selection_highlight.visible = false
+
+	add_child(_selection_highlight)
+
+
+## Show selection highlight with juice animation
+func show_selection_highlight() -> void:
+	if _selection_highlight:
+		_selection_highlight.visible = true
+	_play_selection_juice()
+
+
+## Hide selection highlight
+func hide_selection_highlight() -> void:
+	if _selection_highlight:
+		_selection_highlight.visible = false
+
+
+## Play selection "juice" - scale pulse for satisfying feedback
+func _play_selection_juice() -> void:
+	# Scale pulse animation (1.0 → 1.05 → 1.0 over 0.2s)
+	var tween := create_tween()
+	tween.tween_property(self, "scale", Vector3(1.05, 1.05, 1.05), 0.1)
+	tween.tween_property(self, "scale", Vector3.ONE, 0.1)
+
+	# Play selection SFX (placeholder until audio assets exist)
+	var sfx_path := "res://assets/audio/sfx/sfx_ui_select.ogg"
+	if ResourceLoader.exists(sfx_path) and AudioManager and AudioManager.has_method("play_ui_sfx"):
+		AudioManager.play_ui_sfx("select")
+
+
+func _on_selection_changed(is_selected_state: bool) -> void:
+	if is_selected_state:
+		show_selection_highlight()
+		selected.emit()
+	else:
+		hide_selection_highlight()
+		deselected.emit()
+
+
+## Forward worker_added signal from WorkerSlotComponent (PARTY MODE)
+func _on_worker_added(animal: Animal) -> void:
+	GameLogger.debug("Building", "Worker assigned: %s" % (animal.get_animal_id() if animal.has_method("get_animal_id") else "unknown"))
+
+
+## Forward worker_removed signal from WorkerSlotComponent (PARTY MODE)
+func _on_worker_removed(animal: Animal) -> void:
+	GameLogger.debug("Building", "Worker unassigned")
+
+# =============================================================================
+# HEX OCCUPANCY
+# =============================================================================
+
+## Mark this building's footprint hexes as occupied.
+func _mark_hex_occupied() -> void:
+	if not hex_coord:
+		return
+	if not data:
+		return
+
+	var base_vec: Vector2i = hex_coord.to_vector()
+
+	# Mark all footprint hexes
+	for offset in data.footprint_hexes:
+		var occupied_hex: Vector2i = base_vec + offset
+		HexGrid.mark_hex_occupied(occupied_hex, self)
+
+
+## Unmark this building's footprint hexes.
+func _unmark_hex_occupied() -> void:
+	if not hex_coord:
+		return
+	if not data:
+		return
+
+	var base_vec: Vector2i = hex_coord.to_vector()
+
+	# Unmark all footprint hexes
+	for offset in data.footprint_hexes:
+		var occupied_hex: Vector2i = base_vec + offset
+		HexGrid.mark_hex_unoccupied(occupied_hex)
+
+# =============================================================================
+# PUBLIC API
+# =============================================================================
+
+## Check if building is properly initialized
+func is_initialized() -> bool:
+	return _initialized
+
+
+## Get current hex coordinate
+func get_hex_coord() -> HexCoord:
+	return hex_coord
+
+
+## Get building data
+func get_data() -> BuildingData:
+	return data
+
+
+## Get the building's unique identifier (from data)
+func get_building_id() -> String:
+	if data:
+		return data.building_id
+	return ""
+
+
+## Get the building's type
+func get_building_type() -> BuildingTypes.BuildingType:
+	if data:
+		return data.building_type
+	return BuildingTypes.BuildingType.GATHERER
+
+
+## Check if this building is currently selected
+func is_selected() -> bool:
+	if _selectable:
+		return _selectable.is_selected()
+	return false
+
+
+## Get the worker slot component for external access
+func get_worker_slots() -> WorkerSlotComponent:
+	return _worker_slots
+
+# =============================================================================
+# CLEANUP
+# =============================================================================
+
+## Clean up building resources before removal.
+## Call this before queue_free() for proper cleanup.
+func cleanup() -> void:
+	# 1. Stop processes
+	set_process(false)
+	set_physics_process(false)
+
+	# 2. Emit removal signal before cleanup (only if initialized)
+	# Include hex coordinate for path cache invalidation (Epic 2 retrospective)
+	if _initialized:
+		var hex_vec: Vector2i = hex_coord.to_vector() if hex_coord else Vector2i.ZERO
+		EventBus.building_removed.emit(self, hex_vec)
+
+	# 3. Disconnect signals to prevent orphan connections
+	if _selectable and _selectable.selection_changed.is_connected(_on_selection_changed):
+		_selectable.selection_changed.disconnect(_on_selection_changed)
+	if _worker_slots:
+		if _worker_slots.worker_added.is_connected(_on_worker_added):
+			_worker_slots.worker_added.disconnect(_on_worker_added)
+		if _worker_slots.worker_removed.is_connected(_on_worker_removed):
+			_worker_slots.worker_removed.disconnect(_on_worker_removed)
+		# Clean up worker slot references
+		_worker_slots.cleanup()
+
+	# 4. Unmark hex occupancy
+	_unmark_hex_occupied()
+
+	# 5. Clear references
+	hex_coord = null
+	data = null
+
+	# 6. Remove from groups
+	remove_from_group("buildings")
+
+	# 7. Queue for deletion
+	queue_free()
+
+# =============================================================================
+# STRING REPRESENTATION
+# =============================================================================
+
+func _to_string() -> String:
+	if data:
+		return "Building<%s at %s>" % [data.building_id, hex_coord]
+	return "Building<uninitialized>"

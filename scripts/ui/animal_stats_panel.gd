@@ -54,6 +54,7 @@ func _ready() -> void:
 	if EventBus:
 		EventBus.animal_selected.connect(_on_animal_selected)
 		EventBus.animal_deselected.connect(_on_animal_deselected)
+		EventBus.animal_mood_changed.connect(_on_animal_mood_changed)
 
 	GameLogger.info("UI", "AnimalStatsPanel initialized")
 
@@ -67,6 +68,8 @@ func _exit_tree() -> void:
 			EventBus.animal_selected.disconnect(_on_animal_selected)
 		if EventBus.animal_deselected.is_connected(_on_animal_deselected):
 			EventBus.animal_deselected.disconnect(_on_animal_deselected)
+		if EventBus.animal_mood_changed.is_connected(_on_animal_mood_changed):
+			EventBus.animal_mood_changed.disconnect(_on_animal_mood_changed)
 
 # =============================================================================
 # PUBLIC API
@@ -130,6 +133,15 @@ func _on_energy_changed(current: int, max_energy: int) -> void:
 
 func _on_mood_changed(mood_string: String) -> void:
 	_update_mood_indicator(mood_string)
+	_update_effective_stats()
+
+
+## Handle EventBus mood change (for any animal)
+func _on_animal_mood_changed(animal: Node, mood_string: String) -> void:
+	# Only update if it's the currently displayed animal
+	if is_instance_valid(_current_animal) and animal == _current_animal:
+		_update_mood_indicator(mood_string)
+		_update_effective_stats()
 
 # =============================================================================
 # PRIVATE METHODS
@@ -189,9 +201,8 @@ func _update_display() -> void:
 	_energy_bar.max_value = max_energy
 	_energy_bar.value = current_energy
 
-	# Speed and Strength
-	_speed_value.text = str(stats.get_speed())
-	_strength_value.text = str(stats.get_strength())
+	# Speed and Strength (effective stats with mood modifier)
+	_update_effective_stats()
 
 	# Specialty
 	_specialty_label.text = stats.get_specialty()
@@ -200,6 +211,39 @@ func _update_display() -> void:
 ## Update mood indicator emoji
 func _update_mood_indicator(mood_string: String) -> void:
 	_mood_indicator.text = MOOD_EMOJIS.get(mood_string.to_lower(), "😐")
+
+
+## Update effective stats display (speed and strength with mood modifier)
+func _update_effective_stats() -> void:
+	if not is_instance_valid(_current_animal):
+		return
+
+	var stats := _get_stats_component(_current_animal)
+	if not stats:
+		return
+
+	# Show effective stats (with mood modifier applied)
+	var effective_speed := stats.get_effective_speed() if stats.has_method("get_effective_speed") else float(stats.get_speed())
+	var effective_strength := stats.get_effective_strength() if stats.has_method("get_effective_strength") else float(stats.get_strength())
+
+	# Format with one decimal place if not a whole number
+	_speed_value.text = _format_stat(effective_speed)
+	_strength_value.text = _format_stat(effective_strength)
+
+	# Add visual distinction when mood is not Happy (dimmed color)
+	var mood := stats.get_mood_string() if stats.has_method("get_mood_string") else "happy"
+	var is_happy: bool = mood == "happy"
+	var stat_color := Color(1, 0.95, 0.9, 1) if is_happy else Color(0.8, 0.7, 0.6, 1)
+	_speed_value.modulate = stat_color
+	_strength_value.modulate = stat_color
+
+
+## Format stat value (remove decimal if whole number)
+func _format_stat(value: float) -> String:
+	if is_equal_approx(value, roundf(value)):
+		return str(int(value))
+	else:
+		return "%.1f" % value
 
 
 ## Animate energy bar to new value

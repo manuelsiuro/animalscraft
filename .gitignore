@@ -1,6 +1,7 @@
 # Godot 4.x
 .godot/
 *.translation
+*.uid
 
 # Export builds
 export/**/*.apk

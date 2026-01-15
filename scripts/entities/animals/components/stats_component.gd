@@ -20,6 +20,9 @@ const MOOD_MODIFIERS := {
 	Mood.SAD: 0.7
 }
 
+## Low energy threshold - below this, mood penalty applies when working
+const LOW_ENERGY_THRESHOLD: int = 1
+
 # =============================================================================
 # SIGNALS
 # =============================================================================
@@ -45,6 +48,9 @@ var _current_mood: Mood = Mood.HAPPY
 
 ## Whether component has been initialized
 var _initialized: bool = false
+
+## Track if low energy signal was already emitted (emit only once per cycle)
+var _low_energy_emitted: bool = false
 
 # =============================================================================
 # LIFECYCLE
@@ -109,6 +115,14 @@ func deplete_energy(amount: int) -> void:
 		energy_changed.emit(_current_energy, max_energy)
 		GameLogger.debug("StatsComponent", "Energy depleted: %d → %d" % [old_energy, _current_energy])
 
+		# Check for low energy warning (emit once per cycle)
+		if is_energy_low() and not _low_energy_emitted:
+			_low_energy_emitted = true
+			var parent := get_parent()
+			if parent:
+				EventBus.animal_energy_low.emit(parent)
+			GameLogger.info("StatsComponent", "Energy critically low!")
+
 		# Check for energy depleted condition
 		if _current_energy == 0:
 			_on_energy_depleted()
@@ -129,6 +143,10 @@ func restore_energy(amount: int) -> void:
 		energy_changed.emit(_current_energy, max_energy)
 		GameLogger.debug("StatsComponent", "Energy restored: %d → %d" % [old_energy, _current_energy])
 
+		# Reset low energy flag when above threshold
+		if _current_energy > LOW_ENERGY_THRESHOLD:
+			_low_energy_emitted = false
+
 
 ## Check if energy is fully depleted
 func is_energy_depleted() -> bool:
@@ -138,6 +156,11 @@ func is_energy_depleted() -> bool:
 ## Check if energy is at maximum
 func is_energy_full() -> bool:
 	return _current_energy >= get_max_energy()
+
+
+## Check if energy is critically low (at or below threshold)
+func is_energy_low() -> bool:
+	return _current_energy <= LOW_ENERGY_THRESHOLD
 
 
 ## Internal handler when energy reaches zero

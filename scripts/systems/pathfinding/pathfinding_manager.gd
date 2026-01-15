@@ -5,6 +5,7 @@
 ##
 ## Architecture: scripts/systems/pathfinding/pathfinding_manager.gd
 ## Story: 2-5-implement-astar-pathfinding
+## Updated: 3-1-create-building-entity-structure (building occupancy, targeted cache invalidation)
 class_name PathfindingManager
 extends Node
 
@@ -72,8 +73,9 @@ func _ready() -> void:
 	# Connect to EventBus for terrain changes
 	if is_instance_valid(EventBus):
 		EventBus.territory_claimed.connect(_on_territory_changed)
-		EventBus.building_placed.connect(_on_building_placed)
 		EventBus.building_removed.connect(_on_building_removed)
+		# Story 3-1: Listen to building_spawned for graph updates (buildings occupy hexes)
+		EventBus.building_spawned.connect(_on_building_spawned)
 
 	if is_instance_valid(GameLogger):
 		GameLogger.info("Pathfinding", "PathfindingManager initialized")
@@ -92,10 +94,10 @@ func _exit_tree() -> void:
 	if is_instance_valid(EventBus):
 		if EventBus.territory_claimed.is_connected(_on_territory_changed):
 			EventBus.territory_claimed.disconnect(_on_territory_changed)
-		if EventBus.building_placed.is_connected(_on_building_placed):
-			EventBus.building_placed.disconnect(_on_building_placed)
 		if EventBus.building_removed.is_connected(_on_building_removed):
 			EventBus.building_removed.disconnect(_on_building_removed)
+		if EventBus.building_spawned.is_connected(_on_building_spawned):
+			EventBus.building_spawned.disconnect(_on_building_spawned)
 
 # =============================================================================
 # PUBLIC API
@@ -250,6 +252,7 @@ func invalidate_cache() -> void:
 
 
 ## Check if a hex is passable for pathfinding.
+## A hex is passable if it has walkable terrain AND is not occupied by a building.
 ##
 ## @param hex The hex coordinate to check
 ## @return True if the hex is passable
@@ -262,7 +265,16 @@ func is_passable(hex: HexCoord) -> bool:
 		return false
 
 	# Water and rock are impassable (terrain_type 0 = GRASS)
-	return tile.terrain_type == HexTile.TerrainType.GRASS
+	if tile.terrain_type != HexTile.TerrainType.GRASS:
+		return false
+
+	# Story 3-1: Check building occupancy
+	# Building hexes are impassable for path-through (but adjacent hexes are valid destinations)
+	var hex_vec: Vector2i = hex.to_vector()
+	if HexGrid.is_hex_occupied(hex_vec):
+		return false
+
+	return true
 
 
 ## Get the current number of cached paths.
@@ -499,14 +511,31 @@ func _on_territory_changed(hex_vec: Vector2i) -> void:
 	update_hex(hex)
 
 
-## Handle building placement (buildings may block paths).
-func _on_building_placed(_building: Node, hex_vec: Vector2i) -> void:
-	var hex := HexCoord.from_vector(hex_vec)
-	update_hex(hex)
-
-
 ## Handle building removal (paths may become available).
-func _on_building_removed(_building: Node) -> void:
-	# Full rebuild may be needed if we don't know which hex
-	# For now, just invalidate cache
-	invalidate_cache()
+## Story 3-1: Updated to use hex_coord for targeted cache invalidation (Epic 2 retrospective action item).
+func _on_building_removed(_building: Node, hex_vec: Vector2i) -> void:
+	var hex := HexCoord.from_vector(hex_vec)
+	# Reconnect graph and invalidate affected paths
+	_reconnect_hex_neighbors(hex)
+	_invalidate_paths_through(hex)
+
+	if is_instance_valid(GameLogger):
+		GameLogger.debug("Pathfinding", "Building removed from hex (%d,%d), paths updated" % [hex_vec.x, hex_vec.y])
+
+
+## Handle building spawned (update graph for new building occupancy).
+## Story 3-1: Buildings occupy hexes that should become impassable.
+func _on_building_spawned(building: Node) -> void:
+	if not is_instance_valid(building):
+		return
+
+	# Get building's hex coordinate
+	if building.has_method("get_hex_coord"):
+		var hex: HexCoord = building.get_hex_coord()
+		if hex:
+			# Disconnect the occupied hex from neighbors
+			_reconnect_hex_neighbors(hex)
+			_invalidate_paths_through(hex)
+
+			if is_instance_valid(GameLogger):
+				GameLogger.debug("Pathfinding", "Building spawned at hex (%d,%d), paths updated" % [hex.q, hex.r])

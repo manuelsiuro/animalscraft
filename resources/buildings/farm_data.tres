@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=2 format=3 uid="uid://c4vfl5ntkq5u5"]
+
+[ext_resource type="Script" path="res://scripts/entities/buildings/building_data.gd" id="1_farm"]
+
+[resource]
+script = ExtResource("1_farm")
+building_id = "farm"
+display_name = "Farm"
+building_type = 0
+max_workers = 2
+footprint_hexes = Array[Vector2i]([Vector2i(0, 0)])
+production_recipe_id = ""

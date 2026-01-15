@@ -201,6 +201,11 @@ signal production_halted(building: Node, reason: String)
 ## @param animal The Animal node whose energy is depleted
 signal animal_energy_depleted(animal: Node)
 
+## Emitted when an animal's energy reaches critically low level.
+## This is a warning before full depletion - animal can still work but mood penalty applies.
+## @param animal The Animal node whose energy is low
+signal animal_energy_low(animal: Node)
+
 ## Emitted when an animal's mood changes.
 ## @param animal The Animal node whose mood changed
 ## @param mood The new mood as a string ("happy", "neutral", "sad")
@@ -252,14 +257,19 @@ signal animal_movement_cancelled(animal: Node)
 # BUILDING EVENTS
 # =============================================================================
 
-## Emitted when a building is placed.
+## Emitted when a building is spawned/instantiated.
+## @param building The Building node that was spawned
+signal building_spawned(building: Node)
+
+## Emitted when a building is placed on the hex grid.
 ## @param building The Building node that was placed
 ## @param hex_coord The location of the building
 signal building_placed(building: Node, hex_coord: Vector2i)
 
 ## Emitted when a building is removed/destroyed.
 ## @param building The Building node that was removed
-signal building_removed(building: Node)
+## @param hex_coord The hex coordinate for path cache invalidation (Epic 2 retrospective action item)
+signal building_removed(building: Node, hex_coord: Vector2i)
 
 # =============================================================================
 # CAMERA EVENTS

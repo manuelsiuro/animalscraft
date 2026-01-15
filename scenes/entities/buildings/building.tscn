@@ -1,0 +1,16 @@
+[gd_scene load_steps=4 format=3 uid="uid://bmqjf8wp2s4vy"]
+
+[ext_resource type="Script" path="res://scripts/entities/buildings/building.gd" id="1_building"]
+[ext_resource type="Script" path="res://scripts/entities/animals/components/selectable_component.gd" id="2_selectable"]
+[ext_resource type="Script" path="res://scripts/entities/buildings/components/worker_slot_component.gd" id="3_worker_slots"]
+
+[node name="Building" type="Node3D"]
+script = ExtResource("1_building")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="SelectableComponent" type="Node" parent="."]
+script = ExtResource("2_selectable")
+
+[node name="WorkerSlotComponent" type="Node" parent="."]
+script = ExtResource("3_worker_slots")

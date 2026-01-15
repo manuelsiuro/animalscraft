@@ -5,6 +5,7 @@
 ## Reference: Red Blob Games - https://www.redblobgames.com/grids/hexagons/
 ## Architecture: scripts/world/hex_grid.gd
 ## Story: 1-1-implement-hex-grid-data-structure
+## Updated: 3-1-create-building-entity-structure (hex occupancy tracking)
 class_name HexGrid
 extends RefCounted
 
@@ -14,6 +15,14 @@ extends RefCounted
 
 ## Square root of 3, precalculated for performance
 const SQRT3: float = 1.7320508075688772
+
+# =============================================================================
+# HEX OCCUPANCY TRACKING (Story 3-1)
+# =============================================================================
+
+## Tracks which hexes are occupied by buildings.
+## Key: Vector2i (hex coordinate), Value: Node (building reference)
+static var _occupied_hexes: Dictionary = {}
 
 # =============================================================================
 # COORDINATE CONVERSIONS
@@ -154,3 +163,58 @@ static func get_hex_bounds(hex: HexCoord) -> AABB:
 		Vector3(center.x - width / 2.0, center.y, center.z - depth / 2.0),
 		Vector3(width, height, depth)
 	)
+
+# =============================================================================
+# HEX OCCUPANCY METHODS (Story 3-1)
+# =============================================================================
+
+## Mark a hex as occupied by a building.
+## @param hex: Vector2i hex coordinate
+## @param building: Node reference to the occupying building
+static func mark_hex_occupied(hex: Vector2i, building: Node) -> void:
+	if _occupied_hexes.has(hex):
+		GameLogger.warn("HexGrid", "Hex %s already occupied, overwriting" % hex)
+	_occupied_hexes[hex] = building
+	GameLogger.debug("HexGrid", "Hex %s marked occupied" % hex)
+
+
+## Unmark a hex as occupied (building removed).
+## @param hex: Vector2i hex coordinate to free
+static func mark_hex_unoccupied(hex: Vector2i) -> void:
+	if _occupied_hexes.has(hex):
+		_occupied_hexes.erase(hex)
+		GameLogger.debug("HexGrid", "Hex %s unmarked (now free)" % hex)
+
+
+## Check if a hex can have a building placed on it.
+## Returns false if occupied, true otherwise.
+## @param hex: Vector2i hex coordinate to check
+## @return true if hex is available for building
+static func is_hex_buildable(hex: Vector2i) -> bool:
+	return not _occupied_hexes.has(hex)
+
+
+## Get the building occupying a hex, or null if empty.
+## @param hex: Vector2i hex coordinate to check
+## @return Node reference to building or null
+static func get_building_at_hex(hex: Vector2i) -> Node:
+	return _occupied_hexes.get(hex)
+
+
+## Check if a hex is occupied (by any building).
+## @param hex: Vector2i hex coordinate to check
+## @return true if hex has a building
+static func is_hex_occupied(hex: Vector2i) -> bool:
+	return _occupied_hexes.has(hex)
+
+
+## Get all occupied hexes (for pathfinding etc).
+## @return Array of Vector2i hex coordinates
+static func get_occupied_hexes() -> Array:
+	return _occupied_hexes.keys()
+
+
+## Clear all occupancy data (for testing/reset).
+static func clear_occupancy() -> void:
+	_occupied_hexes.clear()
+	GameLogger.debug("HexGrid", "Occupancy data cleared")

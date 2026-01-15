@@ -42,14 +42,22 @@ func enter() -> void:
 
 func exit() -> void:
 	if is_instance_valid(animal):
-		# Emit recovery signal
-		if is_instance_valid(EventBus):
-			EventBus.animal_recovered.emit(animal)
-
 		var animal_id: String = ""
 		if animal.has_method("get_animal_id"):
 			animal_id = animal.get_animal_id()
-		GameLogger.info("RestingState", "%s recovered - exiting Resting" % animal_id)
+
+		# Only emit recovery signal if energy is actually full (AC4)
+		var stats: Node = animal.get_node_or_null("StatsComponent")
+		var fully_recovered: bool = false
+		if stats and stats.has_method("is_energy_full"):
+			fully_recovered = stats.is_energy_full()
+
+		if fully_recovered:
+			if is_instance_valid(EventBus):
+				EventBus.animal_recovered.emit(animal)
+			GameLogger.info("RestingState", "%s fully recovered - exiting Resting" % animal_id)
+		else:
+			GameLogger.info("RestingState", "%s interrupted rest - exiting Resting (not fully recovered)" % animal_id)
 
 
 func update(delta: float) -> void:
