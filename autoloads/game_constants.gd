@@ -99,6 +99,33 @@ const COMBAT_DEFENSE_MULTIPLIER: float = 0.7
 const COMBAT_RANDOM_VARIANCE: float = 0.2
 
 # =============================================================================
+# RESOURCE CONSTANTS
+# =============================================================================
+
+## Default maximum stack size for resources without explicit limit
+const DEFAULT_RESOURCE_STACK_SIZE: int = 999
+
+## Threshold for low resource warnings (for future UI alerts)
+const RESOURCE_LOW_THRESHOLD: int = 10
+
+# =============================================================================
+# STORAGE CONSTANTS (Story 3-3)
+# =============================================================================
+
+## Storage warning threshold (emit signal at 80% capacity)
+const STORAGE_WARNING_THRESHOLD: float = 0.8
+
+## Storage warning reset threshold (reset warning when below 70%)
+## Uses hysteresis to prevent signal spam
+const STORAGE_WARNING_RESET_THRESHOLD: float = 0.7
+
+## Default village storage capacity per resource type (without storage buildings)
+const DEFAULT_VILLAGE_STORAGE_CAPACITY: int = 100
+
+## Storage capacity bonus from Stockpile building
+const STOCKPILE_STORAGE_BONUS: int = 50
+
+# =============================================================================
 # PRODUCTION CONSTANTS
 # =============================================================================
 

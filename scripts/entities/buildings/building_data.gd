@@ -32,6 +32,19 @@ extends Resource
 ## Links to recipe system for PROCESSOR buildings.
 @export var production_recipe_id: String = ""
 
+## Storage capacity bonus provided by this building (Story 3-3).
+## 0 means this is not a storage building.
+## Stockpile provides +50 capacity per resource type.
+@export var storage_capacity_bonus: int = 0
+
+## Valid terrain types for placement (e.g., ["grass"]).
+## Empty array means placement anywhere is valid.
+@export var valid_terrain: Array[String] = []
+
+## Build cost as resource_id -> amount dictionary.
+## Example: {"wood": 15}
+@export var build_cost: Dictionary = {}
+
 # =============================================================================
 # VALIDATION
 # =============================================================================
@@ -69,6 +82,12 @@ func can_have_workers() -> bool:
 ## @return true if production_recipe_id is not empty
 func is_producer() -> bool:
 	return not production_recipe_id.is_empty()
+
+
+## Check if this building provides storage capacity bonus (Story 3-3).
+## @return true if storage_capacity_bonus > 0
+func is_storage_building() -> bool:
+	return storage_capacity_bonus > 0
 
 
 ## Get all hex offsets in the building footprint.

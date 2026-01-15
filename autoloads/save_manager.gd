@@ -324,16 +324,12 @@ func _gather_animals_data() -> Array:
 	return []
 
 
-## Gather resource data.
+## Gather resource data from ResourceManager.
 func _gather_resources_data() -> Dictionary:
-	# TODO: Implement when resource systems exist (Epic 3)
-	# Currently returns placeholder zero values
-	return {
-		"wood": 0,
-		"wheat": 0,
-		"flour": 0,
-		"bread": 0,
-	}
+	if is_instance_valid(ResourceManager):
+		return ResourceManager.get_save_data()
+	# Fallback if ResourceManager not yet initialized
+	return {"resources": {}}
 
 
 ## Gather progression data.
@@ -373,7 +369,7 @@ func _apply_save_data(save_data: Dictionary) -> bool:
 		save_data = _migrate_save_data(save_data, version)
 
 	# Apply data to systems (will be implemented as systems are built)
-	# For now, just validate the structure
+	# Validate the structure
 	if not save_data.has("world"):
 		return false
 	if not save_data.has("animals"):
@@ -382,6 +378,10 @@ func _apply_save_data(save_data: Dictionary) -> bool:
 		return false
 	if not save_data.has("progression"):
 		return false
+
+	# Load resources into ResourceManager
+	if is_instance_valid(ResourceManager) and save_data.has("resources"):
+		ResourceManager.load_save_data(save_data["resources"])
 
 	return true
 

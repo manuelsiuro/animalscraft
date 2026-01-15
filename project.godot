@@ -28,6 +28,7 @@ AudioManager="*res://autoloads/audio_manager.gd"
 SaveManager="*res://autoloads/save_manager.gd"
 GameManager="*res://autoloads/game_manager.gd"
 SelectionManager="*res://scripts/systems/selection/selection_manager.gd"
+ResourceManager="*res://autoloads/resource_manager.gd"
 AssignmentManager="*res://autoloads/assignment_manager.gd"
 
 [display]

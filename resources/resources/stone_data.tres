@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ResourceData" load_steps=2 format=3 uid="uid://bhj4n6pmca5qw"]
+
+[ext_resource type="Script" path="res://scripts/systems/resources/resource_data.gd" id="1_resource_data"]
+
+[resource]
+script = ExtResource("1_resource_data")
+resource_id = "stone"
+display_name = "Stone"
+icon_path = ""
+category = 0
+max_stack_size = 500
+description = "Solid chunks of stone, used for building foundations and tools."

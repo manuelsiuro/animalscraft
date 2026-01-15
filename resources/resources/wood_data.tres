@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ResourceData" load_steps=2 format=3 uid="uid://dvk7y3hsw8pne"]
+
+[ext_resource type="Script" path="res://scripts/systems/resources/resource_data.gd" id="1_resource_data"]
+
+[resource]
+script = ExtResource("1_resource_data")
+resource_id = "wood"
+display_name = "Wood"
+icon_path = ""
+category = 0
+max_stack_size = 500
+description = "Sturdy logs of wood, essential for construction and crafting."

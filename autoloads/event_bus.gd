@@ -98,6 +98,27 @@ signal resource_depleted(resource_type: String)
 ## @param resource_type The type of resource that hit the limit
 signal resource_full(resource_type: String)
 
+## Emitted when a resource reaches 80% storage capacity (Story 3-3).
+## Warning is only emitted once per threshold crossing (not repeatedly).
+## Resets when resource drops below 70% threshold.
+## @param resource_id The resource type identifier
+signal resource_storage_warning(resource_id: String)
+
+## Emitted when gathering is paused due to full storage (Story 3-3).
+## Actual gathering behavior responds in Story 3-8.
+## @param resource_id The resource type identifier
+## @param reason The reason gathering was paused (e.g., "storage_full")
+signal resource_gathering_paused(resource_id: String, reason: String)
+
+## Emitted when gathering resumes after storage space freed (Story 3-3).
+## @param resource_id The resource type identifier
+signal resource_gathering_resumed(resource_id: String)
+
+## Emitted when total storage capacity changes (building placed/destroyed) (Story 3-3).
+## @param resource_id The resource type identifier
+## @param new_capacity The new total storage capacity
+signal storage_capacity_changed(resource_id: String, new_capacity: int)
+
 # =============================================================================
 # TERRITORY EVENTS
 # =============================================================================
