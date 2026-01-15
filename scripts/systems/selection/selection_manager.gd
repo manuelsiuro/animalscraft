@@ -107,10 +107,25 @@ func _handle_tap(screen_pos: Vector2) -> void:
 		select_animal(animal)
 		# Consume input to prevent camera from processing it
 		get_viewport().set_input_as_handled()
-	else:
-		# Tapped empty space - deselect
-		deselect_current()
-		# Don't consume input - let camera handle for potential pan/zoom
+		return
+
+	# Story 2-7: Two-tap workflow - if animal selected, try to assign destination
+	if _selected_animal and is_instance_valid(_selected_animal):
+		var hex_coord := _world_to_hex(world_pos)
+		if hex_coord and is_instance_valid(AssignmentManager):
+			var assigned := AssignmentManager.assign_to_hex(_selected_animal, hex_coord)
+			if assigned:
+				# Assignment successful - consume input, keep selection
+				get_viewport().set_input_as_handled()
+				return
+			# Assignment failed (AC3/AC4/AC5 - gentle rejection)
+			# Selection remains active for retry per AR11 cozy philosophy
+			# Don't consume input, don't deselect - let player try again
+			return
+
+	# Tapped empty space with no selection or no valid assignment - deselect
+	deselect_current()
+	# Don't consume input - let camera handle for potential pan/zoom
 
 
 func _screen_to_world(screen_pos: Vector2) -> Vector3:
@@ -134,6 +149,14 @@ func _screen_to_world(screen_pos: Vector2) -> Vector3:
 	world_pos.y = 0
 
 	return world_pos
+
+
+## Convert world position to hex coordinate (Story 2-7).
+## Uses HexGrid utility for coordinate conversion.
+## @param world_pos The world position to convert
+## @return The HexCoord at that position, or null if conversion fails
+func _world_to_hex(world_pos: Vector3) -> HexCoord:
+	return HexGrid.world_to_hex(world_pos)
 
 
 func _find_animal_at(world_pos: Vector3) -> Animal:

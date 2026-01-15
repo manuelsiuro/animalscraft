@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bxp7l23mfgv5y"]
+
+[ext_resource type="Script" path="res://scenes/ui/destination_marker.gd" id="1_marker"]
+
+[node name="DestinationMarker" type="Node3D"]
+script = ExtResource("1_marker")
