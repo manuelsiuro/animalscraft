@@ -39,6 +39,7 @@ var _initialized: bool = false
 @onready var _selectable: SelectableComponent = $SelectableComponent
 @onready var _movement: Node = $MovementComponent
 @onready var _stats_component: Node = $StatsComponent
+@onready var _ai: Node = $AIComponent
 
 # =============================================================================
 # SELECTION VISUAL (Story 2-3)
@@ -216,6 +217,8 @@ func cleanup() -> void:
 	# 3. Disconnect signals to prevent orphan connections
 	if _selectable and _selectable.selection_changed.is_connected(_on_selection_changed):
 		_selectable.selection_changed.disconnect(_on_selection_changed)
+
+	# AIComponent handles its own signal cleanup in _exit_tree()
 
 	# 4. Clear references
 	hex_coord = null

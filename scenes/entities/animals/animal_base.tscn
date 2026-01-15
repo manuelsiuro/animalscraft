@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3 uid="uid://c2qwvxp8jkr5m"]
+[gd_scene load_steps=7 format=3 uid="uid://c2qwvxp8jkr5m"]
 
 [ext_resource type="Script" path="res://scripts/entities/animals/animal.gd" id="1_animal"]
 [ext_resource type="Script" path="res://scripts/entities/animals/components/selectable_component.gd" id="2_selectable"]
 [ext_resource type="Script" path="res://scripts/entities/animals/components/movement_component.gd" id="3_movement"]
 [ext_resource type="Script" path="res://scripts/entities/animals/components/stats_component.gd" id="4_stats"]
+[ext_resource type="Script" path="res://scripts/entities/animals/components/ai_component.gd" id="5_ai"]
 
 [sub_resource type="QuadMesh" id="QuadMesh_placeholder"]
 size = Vector2(1, 1)
@@ -25,3 +26,6 @@ script = ExtResource("3_movement")
 
 [node name="StatsComponent" type="Node" parent="."]
 script = ExtResource("4_stats")
+
+[node name="AIComponent" type="Node" parent="."]
+script = ExtResource("5_ai")

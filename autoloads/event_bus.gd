@@ -231,6 +231,11 @@ signal animal_resting(animal: Node)
 ## @param animal The Animal node that recovered
 signal animal_recovered(animal: Node)
 
+## Emitted when an animal's AI state changes.
+## @param animal The Animal node whose state changed
+## @param new_state The new state as a string (e.g., "IDLE", "WALKING")
+signal animal_state_changed(animal: Node, new_state: String)
+
 ## Emitted when an animal starts moving toward a destination.
 ## @param animal The Animal node that started moving
 signal animal_movement_started(animal: Node)
