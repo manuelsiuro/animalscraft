@@ -139,6 +139,13 @@ func _connect_eventbus_signals() -> void:
 	else:
 		push_warning("[Game] EventBus missing 'game_resumed' signal")
 
+	# Connect to building placement signals (Story 3-5)
+	if EventBus.has_signal("building_placement_started"):
+		EventBus.building_placement_started.connect(_on_building_placement_started)
+
+	if EventBus.has_signal("building_placement_ended"):
+		EventBus.building_placement_ended.connect(_on_building_placement_ended)
+
 
 ## Disconnect from EventBus signals during cleanup
 func _disconnect_eventbus_signals() -> void:
@@ -152,6 +159,13 @@ func _disconnect_eventbus_signals() -> void:
 
 	if EventBus.game_resumed.is_connected(_on_game_resumed):
 		EventBus.game_resumed.disconnect(_on_game_resumed)
+
+	# Disconnect building placement signals (Story 3-5)
+	if EventBus.building_placement_started.is_connected(_on_building_placement_started):
+		EventBus.building_placement_started.disconnect(_on_building_placement_started)
+
+	if EventBus.building_placement_ended.is_connected(_on_building_placement_ended):
+		EventBus.building_placement_ended.disconnect(_on_building_placement_ended)
 
 
 ## Connect build button to building menu (Story 3-4)
@@ -259,3 +273,33 @@ func get_ui() -> CanvasLayer:
 ## @return Camera node or null if not available
 func get_camera() -> Camera3D:
 	return camera
+
+
+# =============================================================================
+# BUILDING PLACEMENT HANDLERS (Story 3-5)
+# =============================================================================
+
+## Handle building placement start - disable camera controls
+## @param building_data The BuildingData being placed
+func _on_building_placement_started(building_data: Resource) -> void:
+	# Disable camera controls during placement
+	if camera_controller:
+		camera_controller.set_enabled(false)
+
+	# Hide building menu during placement
+	if _building_menu_panel and _building_menu_panel.is_showing():
+		_building_menu_panel.hide_menu()
+
+	if is_instance_valid(GameLogger):
+		GameLogger.debug("Game", "Building placement started - camera disabled")
+
+
+## Handle building placement end - re-enable camera controls
+## @param placed Whether the building was successfully placed
+func _on_building_placement_ended(placed: bool) -> void:
+	# Re-enable camera controls
+	if camera_controller:
+		camera_controller.set_enabled(true)
+
+	if is_instance_valid(GameLogger):
+		GameLogger.debug("Game", "Building placement ended (placed: %s) - camera enabled" % placed)

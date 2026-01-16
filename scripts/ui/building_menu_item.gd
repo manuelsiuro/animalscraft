@@ -1,8 +1,10 @@
 ## BuildingMenuItem - Individual building entry in the building menu.
 ## Displays building icon, name, resource cost, and handles affordability states.
+## Supports both tap (selection) and drag (placement) gestures.
 ##
 ## Architecture: scripts/ui/building_menu_item.gd
-## Story: 3-4-create-building-menu-ui
+## Story: 3-4-create-building-menu-ui (tap selection)
+## Story: 3-5-implement-building-placement-drag-and-drop (drag detection)
 class_name BuildingMenuItem
 extends Control
 
@@ -10,8 +12,11 @@ extends Control
 # SIGNALS
 # =============================================================================
 
-## Emitted when this building item is selected
+## Emitted when this building item is selected (tap gesture)
 signal selected(building_data: BuildingData)
+
+## Emitted when drag gesture is detected (for placement mode)
+signal drag_started(building_data: BuildingData)
 
 # =============================================================================
 # NODE REFERENCES
@@ -25,6 +30,9 @@ signal selected(building_data: BuildingData)
 # =============================================================================
 # CONSTANTS
 # =============================================================================
+
+## Minimum movement distance before drag starts (pixels)
+const DRAG_THRESHOLD: float = 10.0
 
 ## Building type colors for placeholder icons
 const TYPE_COLORS := {
@@ -52,19 +60,29 @@ var _building_data: BuildingData = null
 ## Whether this building is currently affordable
 var _is_affordable: bool = true
 
+## Drag detection state
+var _drag_start_position: Vector2 = Vector2.ZERO
+var _is_touch_active: bool = false
+var _is_dragging: bool = false
+
 # =============================================================================
 # LIFECYCLE
 # =============================================================================
 
 func _ready() -> void:
-	# Connect button signal
+	# Connect button signal for tap selection (fallback)
 	if _button:
 		_button.pressed.connect(_on_button_pressed)
+		# Enable gui_input to detect drag gestures
+		_button.gui_input.connect(_on_button_gui_input)
 
 
 func _exit_tree() -> void:
-	if _button and _button.pressed.is_connected(_on_button_pressed):
-		_button.pressed.disconnect(_on_button_pressed)
+	if _button:
+		if _button.pressed.is_connected(_on_button_pressed):
+			_button.pressed.disconnect(_on_button_pressed)
+		if _button.gui_input.is_connected(_on_button_gui_input):
+			_button.gui_input.disconnect(_on_button_gui_input)
 
 # =============================================================================
 # PUBLIC API
@@ -131,8 +149,80 @@ func is_affordable() -> bool:
 # SIGNAL HANDLERS
 # =============================================================================
 
+## Handle gui_input for drag detection (Story 3-5 AC1, AC8)
+func _on_button_gui_input(event: InputEvent) -> void:
+	if not _building_data or not _is_affordable:
+		return
+
+	# Handle touch events
+	if event is InputEventScreenTouch:
+		var touch_event := event as InputEventScreenTouch
+		if touch_event.pressed:
+			# Touch started
+			_drag_start_position = touch_event.position
+			_is_touch_active = true
+			_is_dragging = false
+		else:
+			# Touch released
+			if _is_touch_active and not _is_dragging:
+				# This was a tap, not a drag - emit selection
+				selected.emit(_building_data)
+			_is_touch_active = false
+			_is_dragging = false
+
+	# Handle touch drag
+	elif event is InputEventScreenDrag:
+		if _is_touch_active and not _is_dragging:
+			var drag_event := event as InputEventScreenDrag
+			var distance := drag_event.position.distance_to(_drag_start_position)
+			if distance > DRAG_THRESHOLD:
+				_start_drag()
+
+	# Handle mouse events (for desktop/editor testing)
+	elif event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if mouse_event.button_index == MOUSE_BUTTON_LEFT:
+			if mouse_event.pressed:
+				_drag_start_position = mouse_event.position
+				_is_touch_active = true
+				_is_dragging = false
+			else:
+				if _is_touch_active and not _is_dragging:
+					# This was a click, not a drag
+					selected.emit(_building_data)
+				_is_touch_active = false
+				_is_dragging = false
+
+	elif event is InputEventMouseMotion:
+		if _is_touch_active and not _is_dragging and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			var motion_event := event as InputEventMouseMotion
+			var distance := motion_event.position.distance_to(_drag_start_position)
+			if distance > DRAG_THRESHOLD:
+				_start_drag()
+
+
+## Start the drag gesture for placement mode
+func _start_drag() -> void:
+	_is_dragging = true
+
+	# Emit drag_started signal
+	drag_started.emit(_building_data)
+
+	# Emit building_placement_started via EventBus (AC8)
+	if EventBus:
+		EventBus.building_placement_started.emit(_building_data)
+
+	GameLogger.debug("UI", "Drag started for: %s" % _building_data.display_name)
+
+
 func _on_button_pressed() -> void:
+	# Note: This is a fallback for button press signal
+	# Primary gesture handling is in _on_button_gui_input
+	# Only emit selection if not currently in drag mode
 	if not _building_data:
+		return
+
+	if _is_dragging:
 		return
 
 	# Only allow selection if affordable

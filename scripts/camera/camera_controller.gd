@@ -47,6 +47,9 @@ var _drag_previous_pos: Vector2
 var _momentum_velocity: Vector2 = Vector2.ZERO
 var _camera_bounds: AABB  # 3D bounds (will be properly used in Stories 1-3 and 1-4)
 
+# Enable State (Story 3-5)
+var _enabled: bool = true  ## Whether camera controls are active
+
 # Zoom State (Story 1.4)
 var _is_pinching: bool = false
 var _touch_points: Dictionary = {}  ## int (index) -> Vector2 (position)
@@ -82,8 +85,33 @@ func initialize(world_manager: Node) -> void:
 	GameLogger.info("Camera", "Camera bounds initialized")
 
 
+## Set whether camera controls are enabled (Story 3-5).
+## Used to disable camera during building placement mode.
+## @param enabled Whether to enable camera controls
+func set_enabled(enabled: bool) -> void:
+	_enabled = enabled
+	if not enabled:
+		# Cancel any active gestures when disabled
+		_is_dragging = false
+		_is_pinching = false
+		_momentum_velocity = Vector2.ZERO
+		_zoom_momentum = 0.0
+		_touch_points.clear()
+	GameLogger.debug("Camera", "Camera controls enabled: %s" % enabled)
+
+
+## Check if camera controls are currently enabled
+## @return true if camera controls are enabled
+func is_enabled() -> bool:
+	return _enabled
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	"""Handle touch input for camera panning and zooming (Story 1.3 + 1.4)"""
+	# Skip input if disabled (Story 3-5: placement mode)
+	if not _enabled:
+		return
+
 	if event is InputEventScreenTouch:
 		_handle_touch_event(event)
 		get_viewport().set_input_as_handled()
@@ -316,6 +344,10 @@ func _physics_process(delta: float) -> void:
 	"""Apply momentum decay and movement (Story 1.3 + 1.4)"""
 	# Null safety check
 	if not _camera:
+		return
+
+	# Skip processing if disabled (Story 3-5)
+	if not _enabled:
 		return
 
 	# Pan momentum (Story 1.3)

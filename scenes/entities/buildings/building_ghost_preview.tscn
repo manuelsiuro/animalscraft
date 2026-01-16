@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3building_ghost_preview"]
+
+[ext_resource type="Script" path="res://scripts/entities/buildings/building_ghost_preview.gd" id="1_ghost"]
+
+[node name="BuildingGhostPreview" type="Node3D"]
+script = ExtResource("1_ghost")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
