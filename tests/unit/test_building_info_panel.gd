@@ -524,3 +524,326 @@ func test_status_active_constant() -> void:
 
 func test_status_paused_constant() -> void:
 	assert_eq(BuildingInfoPanelScript.STATUS_PAUSED, "Paused (Storage Full)", "Paused status constant")
+
+
+# =============================================================================
+# WORKER SECTION TESTS (Story 3-10, AC1, AC2, AC7, AC8, AC11)
+# =============================================================================
+
+func test_assign_button_visible_for_gatherer_building() -> void:
+	mock_building = await _create_test_building()
+	info_panel.show_for_building(mock_building)
+
+	assert_true(info_panel.is_assign_button_visible(), "Assign button should be visible for gatherer")
+
+
+func test_assign_button_hidden_for_storage_building() -> void:
+	# Create storage building data
+	var storage_data := BuildingData.new()
+	storage_data.building_id = "stockpile"
+	storage_data.display_name = "Stockpile"
+	storage_data.building_type = BuildingTypes.BuildingType.STORAGE
+	storage_data.max_workers = 0
+	storage_data.output_resource_id = ""
+	storage_data.storage_capacity_bonus = 50
+	storage_data.footprint_hexes = [Vector2i.ZERO]
+
+	var storage_hex := HexCoord.new(20, 20)
+	var scene := preload("res://scenes/entities/buildings/farm.tscn")
+	var storage_building := scene.instantiate() as Building
+	add_child(storage_building)
+	await wait_frames(1)
+	storage_building.initialize(storage_hex, storage_data)
+	await wait_frames(1)
+
+	info_panel.show_for_building(storage_building)
+
+	assert_false(info_panel.is_assign_button_visible(), "Assign button should be hidden for non-gatherer")
+
+	storage_building.cleanup()
+	await wait_frames(1)
+
+
+func test_assign_button_enabled_with_available_slots() -> void:
+	mock_building = await _create_test_building()
+	info_panel.show_for_building(mock_building)
+
+	assert_false(info_panel.is_assign_button_disabled(), "Assign button should be enabled with slots available")
+
+
+func test_assign_button_disabled_when_slots_full() -> void:
+	mock_building = await _create_test_building()
+	mock_animal = await _create_mock_animal()
+
+	# Fill worker slots
+	var slots := mock_building.get_worker_slots()
+
+	# Create another animal for second slot
+	var animal2_stats := AnimalStats.new()
+	animal2_stats.animal_id = "rabbit2"
+	animal2_stats.energy = 3
+	animal2_stats.speed = 4
+	animal2_stats.strength = 2
+	animal2_stats.specialty = "Speed +20% gathering"
+	animal2_stats.biome = "plains"
+
+	var scene := preload("res://scenes/entities/animals/rabbit.tscn")
+	var animal2 := scene.instantiate() as Animal
+	add_child(animal2)
+	await wait_frames(1)
+	var animal2_hex := HexCoord.new(1, 1)
+	animal2.initialize(animal2_hex, animal2_stats)
+	await wait_frames(1)
+
+	slots.add_worker(mock_animal)
+	slots.add_worker(animal2)
+	await wait_frames(1)
+
+	info_panel.show_for_building(mock_building)
+
+	assert_true(info_panel.is_assign_button_disabled(), "Assign button should be disabled when slots full")
+
+	animal2.cleanup()
+	await wait_frames(1)
+
+
+func test_worker_icons_show_for_assigned_workers() -> void:
+	mock_building = await _create_test_building()
+	mock_animal = await _create_mock_animal()
+	info_panel.show_for_building(mock_building)
+
+	# Add worker
+	var slots := mock_building.get_worker_slots()
+	slots.add_worker(mock_animal)
+	await wait_frames(2)
+
+	assert_eq(info_panel.get_worker_icons_count(), 1, "Should show one worker icon")
+
+
+func test_worker_icons_update_on_worker_change() -> void:
+	mock_building = await _create_test_building()
+	mock_animal = await _create_mock_animal()
+	info_panel.show_for_building(mock_building)
+
+	# Initially no workers
+	assert_eq(info_panel.get_worker_icons_count(), 0, "Should have no worker icons initially")
+
+	# Add worker
+	var slots := mock_building.get_worker_slots()
+	slots.add_worker(mock_animal)
+	await wait_frames(2)
+
+	assert_eq(info_panel.get_worker_icons_count(), 1, "Should show one worker icon after add")
+
+	# Remove worker
+	slots.remove_worker(mock_animal)
+	await wait_frames(2)
+
+	assert_eq(info_panel.get_worker_icons_count(), 0, "Should have no worker icons after remove")
+
+
+func test_assign_button_enables_when_slot_becomes_available() -> void:
+	mock_building = await _create_test_building()
+	mock_animal = await _create_mock_animal()
+
+	# Create second animal
+	var animal2_stats := AnimalStats.new()
+	animal2_stats.animal_id = "rabbit2"
+	animal2_stats.energy = 3
+	animal2_stats.speed = 4
+	animal2_stats.strength = 2
+	animal2_stats.specialty = "Speed +20% gathering"
+	animal2_stats.biome = "plains"
+
+	var scene := preload("res://scenes/entities/animals/rabbit.tscn")
+	var animal2 := scene.instantiate() as Animal
+	add_child(animal2)
+	await wait_frames(1)
+	var animal2_hex := HexCoord.new(1, 1)
+	animal2.initialize(animal2_hex, animal2_stats)
+	await wait_frames(1)
+
+	# Fill slots
+	var slots := mock_building.get_worker_slots()
+	slots.add_worker(mock_animal)
+	slots.add_worker(animal2)
+	await wait_frames(1)
+
+	info_panel.show_for_building(mock_building)
+	assert_true(info_panel.is_assign_button_disabled(), "Button should be disabled when full")
+
+	# Remove a worker
+	slots.remove_worker(mock_animal)
+	await wait_frames(2)
+
+	assert_false(info_panel.is_assign_button_disabled(), "Button should enable when slot available")
+
+	animal2.cleanup()
+	await wait_frames(1)
+
+
+func test_worker_icon_click_unassigns_worker() -> void:
+	mock_building = await _create_test_building()
+	mock_animal = await _create_mock_animal()
+
+	# Add worker to building
+	var slots := mock_building.get_worker_slots()
+	slots.add_worker(mock_animal)
+	mock_animal.set_assigned_building(mock_building)
+	await wait_frames(1)
+
+	info_panel.show_for_building(mock_building)
+	await wait_frames(1)
+
+	# Trigger unassign
+	info_panel._on_worker_icon_pressed(mock_animal)
+	await wait_frames(2)
+
+	assert_eq(slots.get_worker_count(), 0, "Worker should be unassigned")
+	assert_false(mock_animal.has_assigned_building(), "Animal should have no building assignment")
+
+
+func test_unassign_transitions_animal_to_idle() -> void:
+	mock_building = await _create_test_building()
+	mock_animal = await _create_mock_animal()
+
+	# Add and set to working
+	var slots := mock_building.get_worker_slots()
+	slots.add_worker(mock_animal)
+	mock_animal.set_assigned_building(mock_building)
+
+	var ai := mock_animal.get_node_or_null("AIComponent")
+	if ai:
+		# Force to WORKING state
+		ai.transition_to(AIComponent.AnimalState.WALKING)
+		await wait_frames(1)
+		ai.transition_to(AIComponent.AnimalState.WORKING)
+		await wait_frames(1)
+
+	info_panel.show_for_building(mock_building)
+	await wait_frames(1)
+
+	# Unassign
+	info_panel._on_worker_icon_pressed(mock_animal)
+	await wait_frames(2)
+
+	if ai:
+		assert_eq(ai.get_current_state(), AIComponent.AnimalState.IDLE, "Animal should be in IDLE state")
+
+
+func test_set_worker_selection_overlay() -> void:
+	var mock_overlay := Control.new()
+	mock_overlay.set_script(preload("res://scripts/ui/worker_selection_overlay.gd"))
+
+	info_panel.set_worker_selection_overlay(mock_overlay)
+
+	assert_not_null(info_panel._worker_selection_overlay, "Overlay reference should be set")
+
+	mock_overlay.queue_free()
+	await wait_frames(1)
+
+
+# =============================================================================
+# OVERLAY SIGNAL CONNECTION TESTS (M2 fix, L2 coverage)
+# =============================================================================
+
+func test_overlay_signals_connected_on_assign_button_press() -> void:
+	mock_building = await _create_test_building()
+
+	# Create and set overlay
+	var overlay_scene := preload("res://scenes/ui/worker_selection_overlay.tscn")
+	var overlay := overlay_scene.instantiate()
+	add_child(overlay)
+	await wait_frames(1)
+
+	info_panel.set_worker_selection_overlay(overlay)
+	info_panel.show_for_building(mock_building)
+	await wait_frames(1)
+
+	# Simulate button press
+	info_panel._on_assign_worker_pressed()
+	await wait_frames(1)
+
+	# Verify signals connected
+	assert_true(overlay.worker_assigned.is_connected(info_panel._on_overlay_worker_assigned),
+		"Should connect to worker_assigned signal")
+	assert_true(overlay.closed.is_connected(info_panel._on_overlay_closed),
+		"Should connect to closed signal")
+
+	overlay.queue_free()
+	await wait_frames(1)
+
+
+func test_overlay_signals_disconnected_on_close() -> void:
+	mock_building = await _create_test_building()
+
+	# Create and set overlay
+	var overlay_scene := preload("res://scenes/ui/worker_selection_overlay.tscn")
+	var overlay := overlay_scene.instantiate()
+	add_child(overlay)
+	await wait_frames(1)
+
+	info_panel.set_worker_selection_overlay(overlay)
+	info_panel.show_for_building(mock_building)
+	await wait_frames(1)
+
+	# Open then close overlay
+	info_panel._on_assign_worker_pressed()
+	await wait_frames(1)
+	overlay.hide_overlay()
+	await wait_frames(1)
+
+	# Verify signals disconnected
+	assert_false(overlay.worker_assigned.is_connected(info_panel._on_overlay_worker_assigned),
+		"Should disconnect from worker_assigned signal on close")
+
+	overlay.queue_free()
+	await wait_frames(1)
+
+
+func test_panel_refreshes_on_overlay_worker_assigned() -> void:
+	mock_building = await _create_test_building()
+	mock_animal = await _create_mock_animal()
+
+	# Create and set overlay
+	var overlay_scene := preload("res://scenes/ui/worker_selection_overlay.tscn")
+	var overlay := overlay_scene.instantiate()
+	add_child(overlay)
+	await wait_frames(1)
+
+	info_panel.set_worker_selection_overlay(overlay)
+	info_panel.show_for_building(mock_building)
+	await wait_frames(1)
+
+	# Verify initial state
+	assert_eq(info_panel.get_worker_count_text(), "Workers: 0/2")
+
+	# Manually add worker and emit signal
+	var slots := mock_building.get_worker_slots()
+	slots.add_worker(mock_animal)
+
+	# Trigger the overlay signal handler directly
+	info_panel._on_overlay_worker_assigned(mock_animal, mock_building)
+	await wait_frames(1)
+
+	# Panel should have refreshed
+	assert_eq(info_panel.get_worker_count_text(), "Workers: 1/2", "Panel should refresh on worker_assigned")
+
+	overlay.queue_free()
+	await wait_frames(1)
+
+
+func test_assign_button_warns_when_overlay_not_found() -> void:
+	mock_building = await _create_test_building()
+	info_panel.show_for_building(mock_building)
+	await wait_frames(1)
+
+	# Ensure no overlay is set
+	info_panel._worker_selection_overlay = null
+
+	# This should log a warning but not crash
+	info_panel._on_assign_worker_pressed()
+	await wait_frames(1)
+
+	# Test passes if no crash occurs
+	assert_true(true, "Should handle missing overlay gracefully")

@@ -19,6 +19,9 @@ extends Control
 @onready var _output_label: Label = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/OutputRow/OutputLabel
 @onready var _cycle_label: Label = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/CycleRow/CycleLabel
 @onready var _status_label: Label = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/StatusRow/StatusLabel
+@onready var _worker_section: Control = $PanelContainer/MarginContainer/VBoxContainer/WorkerSection
+@onready var _worker_icons_container: HBoxContainer = $PanelContainer/MarginContainer/VBoxContainer/WorkerSection/WorkerIconsContainer
+@onready var _assign_worker_button: Button = $PanelContainer/MarginContainer/VBoxContainer/WorkerSection/AssignWorkerButton
 
 # =============================================================================
 # CONSTANTS
@@ -29,6 +32,9 @@ const STATUS_IDLE := "Idle (No Workers)"
 const STATUS_ACTIVE := "Active"
 const STATUS_PAUSED := "Paused (Storage Full)"
 
+## Maximum worker icons to display before showing overflow indicator (M4 fix)
+const MAX_WORKER_ICONS_DISPLAY := 4
+
 # =============================================================================
 # STATE
 # =============================================================================
@@ -38,6 +44,9 @@ var _current_building: Building = null
 
 ## Cache worker slots reference for signal disconnection
 var _cached_worker_slots: WorkerSlotComponent = null
+
+## Reference to WorkerSelectionOverlay (assigned from game.tscn or found at runtime)
+var _worker_selection_overlay: Control = null
 
 # =============================================================================
 # LIFECYCLE
@@ -57,6 +66,13 @@ func _ready() -> void:
 		EventBus.production_halted.connect(_on_production_halted)
 		EventBus.resource_gathering_paused.connect(_on_gathering_paused)
 		EventBus.resource_gathering_resumed.connect(_on_gathering_resumed)
+
+	# Connect assign worker button (Story 3-10)
+	if _assign_worker_button:
+		_assign_worker_button.pressed.connect(_on_assign_worker_pressed)
+
+	# Find WorkerSelectionOverlay (deferred to allow scene to initialize)
+	call_deferred("_find_worker_selection_overlay")
 
 	GameLogger.info("UI", "BuildingInfoPanel initialized")
 
@@ -247,6 +263,9 @@ func _update_display() -> void:
 	# Production section (for gatherers)
 	_update_production_display(data)
 
+	# Worker section with assign button (Story 3-10)
+	_update_worker_section(data)
+
 
 ## Update worker count display
 func _update_workers_display(data: BuildingData) -> void:
@@ -297,3 +316,275 @@ func _get_production_status_text(data: BuildingData) -> String:
 		return STATUS_PAUSED
 
 	return STATUS_ACTIVE
+
+
+# =============================================================================
+# WORKER SECTION (Story 3-10)
+# =============================================================================
+
+## Find the WorkerSelectionOverlay in the scene tree
+func _find_worker_selection_overlay() -> void:
+	# Look for overlay in UI layer (sibling or child)
+	var ui_layer: Node = get_parent()
+	if ui_layer:
+		_worker_selection_overlay = ui_layer.get_node_or_null("WorkerSelectionOverlay")
+	if _worker_selection_overlay:
+		GameLogger.debug("UI", "Found WorkerSelectionOverlay")
+
+
+## Update worker section visibility and button state (AC1, AC2, AC11)
+func _update_worker_section(data: BuildingData) -> void:
+	if not _worker_section:
+		return
+
+	# AC11: Only show worker section for gatherer buildings
+	if not data.is_gatherer():
+		_worker_section.visible = false
+		return
+
+	_worker_section.visible = true
+
+	# Update assign worker button state (AC1, AC2)
+	_update_assign_button_state()
+
+	# Update worker icons display (AC7 - display assigned workers)
+	_update_worker_icons()
+
+
+## Update assign worker button enabled/disabled state (AC1, AC2)
+func _update_assign_button_state() -> void:
+	if not _assign_worker_button:
+		return
+
+	if not is_instance_valid(_current_building):
+		_assign_worker_button.disabled = true
+		return
+
+	var slots := _current_building.get_worker_slots()
+	if not slots:
+		_assign_worker_button.disabled = true
+		return
+
+	# AC2: Disable button when slots are full
+	_assign_worker_button.disabled = not slots.is_slot_available()
+
+
+## Update worker icons in the container (AC7)
+func _update_worker_icons() -> void:
+	if not _worker_icons_container:
+		return
+
+	# Clear existing icons
+	for child in _worker_icons_container.get_children():
+		child.queue_free()
+
+	if not is_instance_valid(_current_building):
+		return
+
+	var slots := _current_building.get_worker_slots()
+	if not slots:
+		return
+
+	# Get assigned workers
+	var workers: Array[Animal] = slots.get_workers()
+
+	for i in range(mini(workers.size(), MAX_WORKER_ICONS_DISPLAY)):
+		var worker := workers[i]
+		if not is_instance_valid(worker):
+			continue
+
+		var icon := _create_worker_icon(worker)
+		_worker_icons_container.add_child(icon)
+
+	# Show overflow indicator if more workers than displayed
+	if workers.size() > MAX_WORKER_ICONS_DISPLAY:
+		var overflow := Label.new()
+		overflow.text = "+%d" % (workers.size() - MAX_WORKER_ICONS_DISPLAY)
+		overflow.add_theme_font_size_override("font_size", 14)
+		overflow.add_theme_color_override("font_color", Color(0.8, 0.75, 0.7, 1))
+		_worker_icons_container.add_child(overflow)
+
+
+## Create a clickable worker icon (AC7, AC8)
+## M1 fix: Use actual animal type for icon
+## M5 fix: Include energy in tooltip
+func _create_worker_icon(animal: Animal) -> Control:
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(32, 32)
+
+	# M1 fix: Get correct icon based on animal type
+	button.text = _get_animal_icon_emoji(animal)
+
+	# M5 fix: Add energy info to tooltip
+	var energy_text := _get_animal_energy_text(animal)
+	button.tooltip_text = "Click to unassign\n%s" % energy_text
+
+	# Style the button
+	button.add_theme_font_size_override("font_size", 18)
+
+	# Connect press to unassign handler
+	button.pressed.connect(_on_worker_icon_pressed.bind(animal))
+
+	return button
+
+
+## Get emoji icon based on animal type (M1 fix)
+func _get_animal_icon_emoji(animal: Animal) -> String:
+	if not is_instance_valid(animal):
+		return "🐾"
+
+	var stats = animal.get_stats() if animal.has_method("get_stats") else null
+	if stats and "animal_type" in stats:
+		match stats.animal_type:
+			"rabbit":
+				return "🐰"
+			"squirrel":
+				return "🐿️"
+			"deer":
+				return "🦌"
+			"fox":
+				return "🦊"
+
+	return "🐾"  # Default animal paw
+
+
+## Get animal energy text for tooltip (M5 fix)
+func _get_animal_energy_text(animal: Animal) -> String:
+	if not is_instance_valid(animal):
+		return "Energy: --"
+
+	var stats_comp := animal.get_node_or_null("StatsComponent")
+	if not stats_comp:
+		return "Energy: --"
+
+	var energy := 100
+	var max_energy := 100
+
+	if stats_comp.has_method("get_energy"):
+		energy = stats_comp.get_energy()
+	if stats_comp.has_method("get_max_energy"):
+		max_energy = stats_comp.get_max_energy()
+
+	if max_energy <= 0:
+		return "Energy: 100%"
+
+	var percent := int(float(energy) / float(max_energy) * 100.0)
+	return "Energy: %d%%" % percent
+
+
+## Handle worker icon pressed - unassign worker (AC8)
+func _on_worker_icon_pressed(animal: Animal) -> void:
+	if not is_instance_valid(animal):
+		return
+	if not is_instance_valid(_current_building):
+		return
+
+	var slots := _current_building.get_worker_slots()
+	if not slots:
+		return
+
+	# Remove from building (AC8)
+	if slots.remove_worker(animal):
+		# Clear building reference
+		animal.clear_assigned_building()
+
+		# Transition to IDLE state
+		var ai := animal.get_node_or_null("AIComponent")
+		if ai and ai.has_method("transition_to"):
+			ai.transition_to(AIComponent.AnimalState.IDLE)
+
+		GameLogger.info("UI", "Unassigned worker from %s" % _current_building.get_building_id())
+
+	# Panel will auto-update via workers_changed signal
+
+
+## Handle assign worker button pressed (AC3)
+## M2 fix: Connect to overlay signals for panel refresh
+func _on_assign_worker_pressed() -> void:
+	if not is_instance_valid(_current_building):
+		GameLogger.warn("UI", "No current building for worker assignment")
+		return
+
+	# Find overlay if not cached
+	if not _worker_selection_overlay:
+		_find_worker_selection_overlay()
+
+	if _worker_selection_overlay and _worker_selection_overlay.has_method("show_for_building"):
+		# M2 fix: Connect to worker_assigned signal for panel refresh
+		_connect_overlay_signals()
+		_worker_selection_overlay.show_for_building(_current_building)
+		GameLogger.debug("UI", "Opened worker selection overlay for %s" % _current_building.get_building_id())
+	else:
+		GameLogger.warn("UI", "WorkerSelectionOverlay not found - cannot assign worker")
+
+
+## Connect to overlay signals (M2 fix)
+func _connect_overlay_signals() -> void:
+	if not _worker_selection_overlay:
+		return
+
+	# Connect worker_assigned for immediate panel refresh
+	if _worker_selection_overlay.has_signal("worker_assigned"):
+		if not _worker_selection_overlay.worker_assigned.is_connected(_on_overlay_worker_assigned):
+			_worker_selection_overlay.worker_assigned.connect(_on_overlay_worker_assigned)
+
+	# Connect closed to disconnect signals
+	if _worker_selection_overlay.has_signal("closed"):
+		if not _worker_selection_overlay.closed.is_connected(_on_overlay_closed):
+			_worker_selection_overlay.closed.connect(_on_overlay_closed)
+
+
+## Handle worker assigned from overlay (M2 fix - AC4.4)
+func _on_overlay_worker_assigned(_animal: Animal, _building: Building) -> void:
+	# Refresh panel display immediately after assignment
+	_update_display()
+
+
+## Handle overlay closed - disconnect signals (M2 fix)
+func _on_overlay_closed() -> void:
+	_disconnect_overlay_signals()
+
+
+## Disconnect overlay signals (M2 fix)
+func _disconnect_overlay_signals() -> void:
+	if not _worker_selection_overlay:
+		return
+
+	if _worker_selection_overlay.has_signal("worker_assigned"):
+		if _worker_selection_overlay.worker_assigned.is_connected(_on_overlay_worker_assigned):
+			_worker_selection_overlay.worker_assigned.disconnect(_on_overlay_worker_assigned)
+
+	if _worker_selection_overlay.has_signal("closed"):
+		if _worker_selection_overlay.closed.is_connected(_on_overlay_closed):
+			_worker_selection_overlay.closed.disconnect(_on_overlay_closed)
+
+
+## Set the worker selection overlay reference (for dependency injection/testing)
+func set_worker_selection_overlay(overlay: Control) -> void:
+	_worker_selection_overlay = overlay
+
+
+## Get the assign worker button visibility state (for testing)
+func is_assign_button_visible() -> bool:
+	if not _worker_section or not _assign_worker_button:
+		return false
+	return _worker_section.visible and _assign_worker_button.visible
+
+
+## Get the assign worker button disabled state (for testing)
+func is_assign_button_disabled() -> bool:
+	if not _assign_worker_button:
+		return true
+	return _assign_worker_button.disabled
+
+
+## Get the worker icons container (for testing)
+func get_worker_icons_count() -> int:
+	if not _worker_icons_container:
+		return 0
+	# Count only buttons (worker icons), not overflow labels
+	var count := 0
+	for child in _worker_icons_container.get_children():
+		if child is Button:
+			count += 1
+	return count

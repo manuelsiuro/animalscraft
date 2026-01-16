@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://build_button" path="res://scenes/ui/build_button.tscn" id="5_build_button"]
 [ext_resource type="PackedScene" uid="uid://building_menu_panel" path="res://scenes/ui/building_menu_panel.tscn" id="6_building_menu"]
 [ext_resource type="PackedScene" uid="uid://csax5pnb2h4jm" path="res://scenes/ui/building_info_panel.tscn" id="7_building_info_panel"]
+[ext_resource type="PackedScene" uid="uid://worker_selection_overlay" path="res://scenes/ui/worker_selection_overlay.tscn" id="8_worker_selection_overlay"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -30,6 +31,8 @@ script = ExtResource("2_lnu2h")
 [node name="BuildButton" parent="UI" instance=ExtResource("5_build_button")]
 
 [node name="BuildingMenuPanel" parent="UI" instance=ExtResource("6_building_menu")]
+
+[node name="WorkerSelectionOverlay" parent="UI" instance=ExtResource("8_worker_selection_overlay")]
 
 [node name="Camera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 50, 30)

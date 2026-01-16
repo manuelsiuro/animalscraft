@@ -176,3 +176,21 @@ theme_override_colors/font_color = Color(1, 0.95, 0.9, 1)
 theme_override_font_sizes/font_size = 14
 text = "Idle (No Workers)"
 vertical_alignment = 1
+
+[node name="WorkerSection" type="VBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="WorkerIconsContainer" type="HBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer/WorkerSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="AssignWorkerButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/WorkerSection"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.15, 0.12, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.15, 0.12, 0.1, 1)
+theme_override_colors/font_pressed_color = Color(0.15, 0.12, 0.1, 1)
+theme_override_colors/font_disabled_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 16
+text = "+ Assign Worker"
