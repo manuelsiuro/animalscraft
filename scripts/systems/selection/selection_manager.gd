@@ -116,6 +116,21 @@ func _handle_tap(screen_pos: Vector2) -> void:
 	# Story 3-1: Check for building at position
 	var building := _find_building_at(world_pos)
 
+	# Story 3-9: If animal is selected and we tap a gatherer building,
+	# assign the animal to the building instead of selecting the building.
+	if building and _selected_animal and is_instance_valid(_selected_animal):
+		# Check if building is a gatherer with worker slots
+		if building.has_method("is_gatherer") and building.is_gatherer():
+			# Try to assign via hex (existing workflow handles building assignment)
+			var hex_coord := _world_to_hex(world_pos)
+			if hex_coord and is_instance_valid(AssignmentManager):
+				var assigned := AssignmentManager.assign_to_hex(_selected_animal, hex_coord)
+				if assigned:
+					# Assignment started - consume input, keep selection
+					get_viewport().set_input_as_handled()
+					return
+				# Assignment failed - fall through to select the building instead
+
 	if building:
 		select_building(building)
 		# Consume input to prevent camera from processing it
