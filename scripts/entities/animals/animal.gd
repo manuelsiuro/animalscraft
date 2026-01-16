@@ -31,6 +31,10 @@ var stats: AnimalStats
 ## Whether animal has been properly initialized
 var _initialized: bool = false
 
+## Current building this animal is assigned to (Story 3-8).
+## Used for worker assignment tracking and cleanup.
+var _current_building: Node = null
+
 # =============================================================================
 # COMPONENTS (child nodes, assigned in _ready)
 # =============================================================================
@@ -199,6 +203,34 @@ func is_selected() -> bool:
 		return _selectable.is_selected()
 	return false
 
+
+## Set the building this animal is assigned to (Story 3-8).
+## @param building The Building node this animal is working at
+func set_assigned_building(building: Node) -> void:
+	_current_building = building
+	if building:
+		GameLogger.debug("Animal", "%s assigned to building" % get_animal_id())
+
+
+## Get the building this animal is assigned to (Story 3-8).
+## @return The Building node or null if not assigned
+func get_assigned_building() -> Node:
+	return _current_building
+
+
+## Clear the building assignment (Story 3-8).
+## Called when animal is removed from building or building is destroyed.
+func clear_assigned_building() -> void:
+	if _current_building:
+		GameLogger.debug("Animal", "%s cleared building assignment" % get_animal_id())
+	_current_building = null
+
+
+## Check if this animal is assigned to a building (Story 3-8).
+## @return true if animal has a building assignment
+func has_assigned_building() -> bool:
+	return is_instance_valid(_current_building)
+
 # =============================================================================
 # CLEANUP
 # =============================================================================
@@ -223,6 +255,7 @@ func cleanup() -> void:
 	# 4. Clear references
 	hex_coord = null
 	stats = null
+	_current_building = null
 
 	# 5. Remove from groups
 	remove_from_group("animals")

@@ -8,6 +8,13 @@
 extends Node
 
 # =============================================================================
+# CONSTANTS - AIComponent.AnimalState enum values (avoid magic numbers)
+# =============================================================================
+
+const AI_STATE_IDLE := 0
+const AI_STATE_WORKING := 2
+
+# =============================================================================
 # SIGNALS
 # =============================================================================
 
@@ -246,8 +253,12 @@ func _get_animal_id(animal: Node) -> String:
 
 
 ## Cancel existing assignment for an animal
+## Extended in Story 3-8 to remove animal from current building.
 func _cancel_existing(animal: Node) -> void:
 	var animal_id := _get_animal_id(animal)
+
+	# Story 3-8: Remove from current building first (AC8 - re-assignment cleanup)
+	_remove_from_current_building(animal)
 
 	# Stop movement if currently moving
 	var movement := animal.get_node_or_null("MovementComponent")
@@ -315,6 +326,7 @@ func _hide_destination_marker(animal: Node) -> void:
 # =============================================================================
 
 ## Handle movement completion (AC5.2 - clear assignment, hide marker)
+## Extended in Story 3-8 to handle building assignment.
 func _on_animal_movement_completed(animal: Node) -> void:
 	if not is_instance_valid(animal):
 		return
@@ -322,6 +334,9 @@ func _on_animal_movement_completed(animal: Node) -> void:
 	var animal_id := _get_animal_id(animal)
 	_active_assignments.erase(animal_id)
 	_hide_destination_marker(animal)
+
+	# Story 3-8: Check if destination has a building
+	_try_assign_to_building(animal)
 
 
 ## Handle movement cancellation (AC5.3 - update state, hide marker)
@@ -342,3 +357,104 @@ func _on_animal_removed(animal: Node) -> void:
 	var animal_id := _get_animal_id(animal)
 	_active_assignments.erase(animal_id)
 	_hide_destination_marker(animal)
+
+# =============================================================================
+# BUILDING ASSIGNMENT (Story 3-8)
+# =============================================================================
+
+## Try to assign animal to a building at its current location.
+## Called after movement completion to check if destination has a building.
+## @param animal The animal that completed movement
+func _try_assign_to_building(animal: Node) -> void:
+	if not is_instance_valid(animal):
+		return
+
+	# Get animal's current hex coordinate
+	var current_hex: HexCoord = null
+	if animal.has_method("get_hex_coord"):
+		current_hex = animal.get_hex_coord()
+	elif "hex_coord" in animal:
+		current_hex = animal.hex_coord
+
+	if not current_hex:
+		return
+
+	# Check if there's a building at this hex (O(1) dictionary lookup - AC3.2)
+	var hex_vec: Vector2i = current_hex.to_vector()
+	var building: Node = HexGrid.get_building_at_hex(hex_vec)
+
+	if not building:
+		return  # No building at this hex
+
+	# Only assign to gatherer buildings with worker slots
+	if not building.has_method("get_worker_slots"):
+		return
+
+	var slots = building.get_worker_slots()
+	if not slots:
+		return
+
+	# Check slot availability FIRST (AC3.3 - explicit check before add)
+	if not slots.is_slot_available():
+		# AC11: Slots full - animal stays IDLE at location
+		if is_instance_valid(GameLogger):
+			GameLogger.debug("Assignment", "Slots full at %s - animal remains IDLE" % building)
+		return
+
+	# Try to add worker (AC3.3)
+	if not slots.add_worker(animal):
+		# Add failed for some other reason
+		if is_instance_valid(GameLogger):
+			GameLogger.debug("Assignment", "Failed to add worker to %s" % building)
+		return
+
+	# Worker added successfully - transition to WORKING state (AC3.4)
+	var ai := animal.get_node_or_null("AIComponent")
+	if ai and ai.has_method("transition_to"):
+		ai.transition_to(AI_STATE_WORKING)
+
+	# Store building reference in animal (AC3.7, AC3.8)
+	if animal.has_method("set_assigned_building"):
+		animal.set_assigned_building(building)
+
+	if is_instance_valid(GameLogger):
+		var animal_id := _get_animal_id(animal)
+		GameLogger.info("Assignment", "%s assigned to building %s" % [animal_id, building])
+
+
+## Remove animal from its current building assignment.
+## Called before re-assignment or when canceling assignment.
+## @param animal The animal to remove from building
+func _remove_from_current_building(animal: Node) -> void:
+	if not is_instance_valid(animal):
+		return
+
+	# Check if animal has a building assignment
+	if not animal.has_method("get_assigned_building"):
+		return
+
+	var building: Node = animal.get_assigned_building()
+	if not is_instance_valid(building):
+		# Clear stale reference
+		if animal.has_method("clear_assigned_building"):
+			animal.clear_assigned_building()
+		return
+
+	# Remove from building's worker slots (AC3.6)
+	if building.has_method("get_worker_slots"):
+		var slots = building.get_worker_slots()
+		if slots and slots.has_method("remove_worker"):
+			slots.remove_worker(animal)
+
+	# Clear building reference (AC3.9)
+	if animal.has_method("clear_assigned_building"):
+		animal.clear_assigned_building()
+
+	# Transition to IDLE state
+	var ai := animal.get_node_or_null("AIComponent")
+	if ai and ai.has_method("transition_to"):
+		ai.transition_to(AI_STATE_IDLE)
+
+	if is_instance_valid(GameLogger):
+		var animal_id := _get_animal_id(animal)
+		GameLogger.debug("Assignment", "%s removed from building" % animal_id)

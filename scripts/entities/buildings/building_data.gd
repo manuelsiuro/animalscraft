@@ -32,6 +32,15 @@ extends Resource
 ## Links to recipe system for PROCESSOR buildings.
 @export var production_recipe_id: String = ""
 
+## Output resource ID for gatherer buildings (Story 3-8).
+## The resource type this building produces (e.g., "wheat", "wood").
+## Empty for non-gatherer buildings.
+@export var output_resource_id: String = ""
+
+## Production time in seconds for gatherer buildings (Story 3-8).
+## Time for one production cycle. Default 5.0 seconds.
+@export var production_time: float = 5.0
+
 ## Storage capacity bonus provided by this building (Story 3-3).
 ## 0 means this is not a storage building.
 ## Stockpile provides +50 capacity per resource type.
@@ -119,6 +128,12 @@ func is_producer() -> bool:
 	return not production_recipe_id.is_empty()
 
 
+## Check if this building is a gatherer (produces output resource) (Story 3-8).
+## @return true if output_resource_id is not empty
+func is_gatherer() -> bool:
+	return not output_resource_id.is_empty()
+
+
 ## Check if this building provides storage capacity bonus (Story 3-3).
 ## @return true if storage_capacity_bonus > 0
 func is_storage_building() -> bool:
@@ -135,4 +150,7 @@ func get_footprint() -> Array[Vector2i]:
 # =============================================================================
 
 func _to_string() -> String:
-	return "BuildingData<%s: %s, workers=%d>" % [building_id, get_type_name(), max_workers]
+	var output_info := ""
+	if not output_resource_id.is_empty():
+		output_info = ", output=%s" % output_resource_id
+	return "BuildingData<%s: %s, workers=%d%s>" % [building_id, get_type_name(), max_workers, output_info]

@@ -30,6 +30,9 @@ var data: BuildingData
 ## Whether building has been properly initialized
 var _initialized: bool = false
 
+## Track if production has been started (for signal emission) (Story 3-8)
+var _production_active: bool = false
+
 # =============================================================================
 # COMPONENTS (child nodes, assigned in _ready)
 # =============================================================================
@@ -37,6 +40,10 @@ var _initialized: bool = false
 @onready var _visual: Node3D = $Visual
 @onready var _selectable: SelectableComponent = $SelectableComponent
 @onready var _worker_slots: WorkerSlotComponent = $WorkerSlotComponent
+
+## GathererComponent for production - optional, only for gatherer buildings (Story 3-8)
+## Note: Using Node type to avoid load order issues with class_name
+var _gatherer: Node = null
 
 # =============================================================================
 # SELECTION VISUAL (same pattern as Animal)
@@ -76,6 +83,12 @@ func initialize(hex: HexCoord, building_data: BuildingData) -> void:
 	# Initialize worker slots if it exists and has initialize method
 	if _worker_slots and _worker_slots.has_method("initialize"):
 		_worker_slots.initialize(building_data.max_workers if building_data else 0)
+
+	# Initialize GathererComponent for gatherer buildings (Story 3-8)
+	if building_data and building_data.is_gatherer():
+		_gatherer = get_node_or_null("GathererComponent")
+		if _gatherer and _gatherer.has_method("initialize"):
+			_gatherer.initialize(self, building_data.output_resource_id, building_data.production_time)
 
 	# Mark hex as occupied
 	_mark_hex_occupied()
@@ -171,14 +184,38 @@ func _on_selection_changed(is_selected_state: bool) -> void:
 		deselected.emit()
 
 
-## Forward worker_added signal from WorkerSlotComponent (PARTY MODE)
+## Handle worker_added signal from WorkerSlotComponent (Story 3-8)
+## Starts production for the worker on GathererComponent if available.
 func _on_worker_added(animal: Animal) -> void:
-	GameLogger.debug("Building", "Worker assigned: %s" % (animal.get_animal_id() if animal.has_method("get_animal_id") else "unknown"))
+	var animal_id := animal.get_animal_id() if animal.has_method("get_animal_id") else "unknown"
+	GameLogger.debug("Building", "Worker assigned: %s" % animal_id)
+
+	# Start production on GathererComponent (Story 3-8)
+	if _gatherer and _gatherer.is_initialized():
+		_gatherer.start_worker(animal)
+
+		# Emit production_started on first worker (AC4)
+		if not _production_active:
+			_production_active = true
+			EventBus.production_started.emit(self)
+			GameLogger.info("Building", "Production started at %s" % get_building_id())
 
 
-## Forward worker_removed signal from WorkerSlotComponent (PARTY MODE)
+## Handle worker_removed signal from WorkerSlotComponent (Story 3-8)
+## Stops production for the worker on GathererComponent if available.
 func _on_worker_removed(animal: Animal) -> void:
-	GameLogger.debug("Building", "Worker unassigned")
+	var animal_id := animal.get_animal_id() if animal and animal.has_method("get_animal_id") else "unknown"
+	GameLogger.debug("Building", "Worker unassigned: %s" % animal_id)
+
+	# Stop production on GathererComponent (Story 3-8)
+	if _gatherer and _gatherer.is_initialized():
+		_gatherer.stop_worker(animal)
+
+		# Emit production_halted when last worker leaves (AC4)
+		if _worker_slots and _worker_slots.get_worker_count() == 0:
+			_production_active = false
+			EventBus.production_halted.emit(self, "no_workers")
+			GameLogger.info("Building", "Production halted at %s - no workers" % get_building_id())
 
 # =============================================================================
 # HEX OCCUPANCY
@@ -257,6 +294,24 @@ func is_selected() -> bool:
 func get_worker_slots() -> WorkerSlotComponent:
 	return _worker_slots
 
+
+## Get the gatherer component for external access (Story 3-8).
+## @return GathererComponent (as Node) or null if not a gatherer building
+func get_gatherer() -> Node:
+	return _gatherer
+
+
+## Check if this building is a gatherer (produces resources) (Story 3-8).
+## @return true if this building has a GathererComponent
+func is_gatherer() -> bool:
+	return _gatherer != null and _gatherer.is_initialized()
+
+
+## Check if production is currently active (Story 3-8).
+## @return true if at least one worker is producing
+func is_production_active() -> bool:
+	return _production_active
+
 # =============================================================================
 # CLEANUP
 # =============================================================================
@@ -285,17 +340,23 @@ func cleanup() -> void:
 		# Clean up worker slot references
 		_worker_slots.cleanup()
 
-	# 4. Unmark hex occupancy
+	# 4. Clean up GathererComponent (Story 3-8)
+	if _gatherer:
+		_gatherer.cleanup()
+		_gatherer = null
+
+	# 5. Unmark hex occupancy
 	_unmark_hex_occupied()
 
-	# 5. Clear references
+	# 6. Clear references
 	hex_coord = null
 	data = null
+	_production_active = false
 
-	# 6. Remove from groups
+	# 7. Remove from groups
 	remove_from_group("buildings")
 
-	# 7. Queue for deletion
+	# 8. Queue for deletion
 	queue_free()
 
 # =============================================================================
