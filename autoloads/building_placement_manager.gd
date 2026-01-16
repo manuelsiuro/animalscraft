@@ -532,9 +532,27 @@ func _place_building() -> bool:
 
 
 ## Instantiate a building node from the building data.
+## Uses BuildingFactory's scene map to load correct visual scene (farm.tscn, sawmill.tscn, etc.)
+## Story: 3-7-create-gatherer-buildings-farm-sawmill (code review fix)
 ## @return The building node, or null if failed
 func _instantiate_building() -> Building:
-	# Load building scene
+	if not current_building_data:
+		GameLogger.error("BuildingPlacementManager", "Cannot instantiate - no building data")
+		return null
+
+	var building_id := current_building_data.building_id
+
+	# Use BuildingFactory's scene map to load the correct scene with unique visuals
+	if BuildingFactory.has_building_type(building_id):
+		var scene: PackedScene = BuildingFactory.BUILDING_SCENES[building_id]
+		var building := scene.instantiate() as Building
+		if not building:
+			GameLogger.error("BuildingPlacementManager", "Failed to instantiate %s scene" % building_id)
+			return null
+		return building
+
+	# Fallback: Load generic building scene for unknown types
+	GameLogger.warn("BuildingPlacementManager", "No specific scene for %s, using generic" % building_id)
 	var scene_path := "res://scenes/entities/buildings/building.tscn"
 
 	if not ResourceLoader.exists(scene_path):
