@@ -10,3 +10,4 @@ building_type = 0
 max_workers = 2
 footprint_hexes = Array[Vector2i]([Vector2i(0, 0)])
 production_recipe_id = ""
+terrain_requirements = Array[int]([0, 2])

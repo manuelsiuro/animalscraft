@@ -3,7 +3,7 @@
 ## Data is read-only and shared across all buildings of the same type.
 ##
 ## Architecture: scripts/entities/buildings/building_data.gd
-## Story: 3-1-create-building-entity-structure
+## Story: 3-1-create-building-entity-structure, 3-6-display-placement-validity-indicators
 class_name BuildingData
 extends Resource
 
@@ -39,7 +39,14 @@ extends Resource
 
 ## Valid terrain types for placement (e.g., ["grass"]).
 ## Empty array means placement anywhere is valid.
+## @deprecated Use terrain_requirements instead
 @export var valid_terrain: Array[String] = []
+
+## Terrain types this building can be placed on (Story 3-6).
+## Empty array OR null means any non-water terrain is valid.
+## VALIDATED at resource load time via _validate_on_load()
+## Uses HexTile.TerrainType values: GRASS=0, WATER=1, ROCK=2
+@export var terrain_requirements: Array[int] = []
 
 ## Build cost as resource_id -> amount dictionary.
 ## Example: {"wood": 15}
@@ -48,6 +55,22 @@ extends Resource
 # =============================================================================
 # VALIDATION
 # =============================================================================
+
+## Validate terrain_requirements at resource load time (Story 3-6).
+## Ensures array is valid and not corrupt. Called on resource load.
+func _validate_on_load() -> void:
+	# Ensure terrain_requirements is valid array (not corrupt)
+	if terrain_requirements == null:
+		terrain_requirements = []
+
+	# Filter out invalid terrain types (WATER = 1 should not be in requirements)
+	var valid_reqs: Array[int] = []
+	for req in terrain_requirements:
+		# WATER (1) is never a valid terrain requirement
+		if req != 1:  # HexTile.TerrainType.WATER
+			valid_reqs.append(req)
+	terrain_requirements = valid_reqs
+
 
 ## Check if this building data is valid (has required fields).
 ## @return true if building data has valid configuration
@@ -61,6 +84,18 @@ func is_valid() -> bool:
 	if footprint_hexes.is_empty():
 		return false
 	return true
+
+
+## Check if a terrain type is valid for this building (Story 3-6).
+## @param terrain_type The HexTile.TerrainType value to check
+## @return true if building can be placed on this terrain
+func is_terrain_valid(terrain_type: int) -> bool:
+	# Empty array means any non-water terrain is valid
+	if terrain_requirements.is_empty():
+		return terrain_type != 1  # Not WATER
+
+	# Check if terrain is in requirements list
+	return terrain_type in terrain_requirements
 
 # =============================================================================
 # HELPER METHODS

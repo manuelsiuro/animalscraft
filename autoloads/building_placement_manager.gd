@@ -4,7 +4,7 @@
 ## Architecture: autoloads/building_placement_manager.gd
 ## Order: 12 (after ResourceManager, before GameManager)
 ## Source: game-architecture.md#Building System
-## Story: 3-5-implement-building-placement-drag-and-drop
+## Story: 3-5-implement-building-placement-drag-and-drop, 3-6-display-placement-validity-indicators
 ##
 ## Usage:
 ##   EventBus.building_placement_started.connect(_on_placement_started)
@@ -16,6 +16,22 @@
 ##   3. User drags finger - ghost follows, snapping to hexes
 ##   4. On release: if valid hex, place building; else cancel
 extends Node
+
+# =============================================================================
+# ENUMS
+# =============================================================================
+
+## Invalidity reason for placement failures.
+## CRITICAL: Order reflects PRIORITY - first match wins when multiple failures occur.
+## Story: 3-6-display-placement-validity-indicators
+enum InvalidityReason {
+	NONE = 0,              ## Placement is valid
+	WATER = 1,             ## Cannot build on water (highest priority)
+	OCCUPIED = 2,          ## Hex already has building/entity
+	UNCLAIMED = 3,         ## Territory not claimed by player
+	TERRAIN_INCOMPATIBLE = 4,  ## Building doesn't support this terrain
+	CANNOT_AFFORD = 5      ## Insufficient resources (lowest priority)
+}
 
 # =============================================================================
 # PLACEMENT STATE
@@ -32,6 +48,9 @@ var current_preview_hex: Vector2i = Vector2i.ZERO
 
 ## Whether current hex position is valid for placement
 var _is_current_hex_valid: bool = false
+
+## Current invalidity reason (Story 3-6)
+var _current_invalidity_reason: InvalidityReason = InvalidityReason.NONE
 
 ## Ghost preview node reference
 var _ghost_preview: Node3D = null
@@ -210,9 +229,10 @@ func _update_ghost_position(screen_pos: Vector2) -> void:
 	_ghost_preview.position = snapped_pos
 	_ghost_preview.visible = true
 
-	# Check validity and update visual
-	_is_current_hex_valid = is_placement_valid(hex_vec, current_building_data)
-	_update_ghost_validity(_is_current_hex_valid)
+	# Check validity and update visual with invalidity reason (Story 3-6)
+	_current_invalidity_reason = check_placement_validity(hex_vec, current_building_data)
+	_is_current_hex_valid = (_current_invalidity_reason == InvalidityReason.NONE)
+	_update_ghost_validity(_current_invalidity_reason)
 
 
 ## Convert screen position to world position via camera raycast.
@@ -235,13 +255,15 @@ func _screen_to_world(screen_pos: Vector2) -> Vector3:
 	return Vector3.ZERO
 
 
-## Check if placement is valid at given hex coordinate.
+## Check placement validity with priority-ordered reason detection.
+## Checks in order: water -> occupied -> unclaimed -> terrain -> afford
+## Story: 3-6-display-placement-validity-indicators
 ## @param hex_coord The Vector2i hex coordinate to check
 ## @param building_data The building data to validate
-## @return true if placement is valid
-func is_placement_valid(hex_coord: Vector2i, building_data: BuildingData) -> bool:
+## @return InvalidityReason.NONE if valid, highest priority reason otherwise
+func check_placement_validity(hex_coord: Vector2i, building_data: BuildingData) -> InvalidityReason:
 	if not building_data:
-		return false
+		return InvalidityReason.CANNOT_AFFORD  # Defensive
 
 	# Create HexCoord for lookups
 	var hex := HexCoord.from_vector(hex_coord)
@@ -250,41 +272,94 @@ func is_placement_valid(hex_coord: Vector2i, building_data: BuildingData) -> boo
 	var world_managers := get_tree().get_nodes_in_group("world_managers")
 	if world_managers.is_empty():
 		GameLogger.warn("BuildingPlacementManager", "No WorldManager found")
-		return false
+		return InvalidityReason.UNCLAIMED  # No world = no territory
 
 	var world_manager: WorldManager = world_managers[0] as WorldManager
 	if not world_manager:
-		return false
+		return InvalidityReason.UNCLAIMED
 
 	var tile := world_manager.get_tile_at(hex)
 	if not tile:
 		GameLogger.debug("BuildingPlacementManager", "No tile at hex %s" % hex_coord)
-		return false
+		return InvalidityReason.UNCLAIMED  # No tile = can't place
 
-	# Check terrain is not water (TerrainType.WATER = 1)
+	# Priority 1: Water terrain (absolute blocker)
 	if tile.terrain_type == HexTile.TerrainType.WATER:
 		GameLogger.debug("BuildingPlacementManager", "Cannot build on water at %s" % hex_coord)
-		return false
+		return InvalidityReason.WATER
 
-	# Check hex is not occupied
+	# Priority 2: Hex occupied
 	if HexGrid.is_hex_occupied(hex_coord):
 		GameLogger.debug("BuildingPlacementManager", "Hex occupied at %s" % hex_coord)
-		return false
+		return InvalidityReason.OCCUPIED
 
-	# Check territory is claimed (TerritoryState.CLAIMED = 3)
+	# Priority 3: Territory not claimed
 	var territory_manager := world_manager.get_territory_manager()
 	if territory_manager:
 		var state := territory_manager.get_territory_state(hex)
 		if state != TerritoryManager.TerritoryState.CLAIMED:
 			GameLogger.debug("BuildingPlacementManager", "Hex not claimed at %s (state: %d)" % [hex_coord, state])
-			return false
+			return InvalidityReason.UNCLAIMED
 
-	# Check player can afford building
+	# Priority 4: Terrain incompatible with building requirements
+	if not _is_terrain_compatible(tile.terrain_type, building_data):
+		GameLogger.debug("BuildingPlacementManager", "Terrain incompatible for %s at %s" % [building_data.display_name, hex_coord])
+		return InvalidityReason.TERRAIN_INCOMPATIBLE
+
+	# Priority 5: Cannot afford
 	if not _can_afford(building_data):
 		GameLogger.debug("BuildingPlacementManager", "Cannot afford %s" % building_data.display_name)
+		return InvalidityReason.CANNOT_AFFORD
+
+	return InvalidityReason.NONE
+
+
+## @deprecated Use check_placement_validity() instead
+## Check if placement is valid at given hex coordinate.
+## Story: 3-5 (maintained for backward compatibility)
+## @param hex_coord The Vector2i hex coordinate to check
+## @param building_data The building data to validate
+## @return true if placement is valid
+func is_placement_valid(hex_coord: Vector2i, building_data: BuildingData) -> bool:
+	return check_placement_validity(hex_coord, building_data) == InvalidityReason.NONE
+
+
+## Check if terrain type is compatible with building requirements.
+## Empty or null terrain_requirements means any non-water terrain is valid.
+## Story: 3-6-display-placement-validity-indicators
+## @param terrain_type The terrain type of the hex
+## @param building_data The building data with terrain requirements
+## @return true if terrain is compatible
+func _is_terrain_compatible(terrain_type: HexTile.TerrainType, building_data: BuildingData) -> bool:
+	if not building_data:
+		return false
+
+	# Use BuildingData's is_terrain_valid method if available
+	if building_data.has_method("is_terrain_valid"):
+		return building_data.is_terrain_valid(terrain_type)
+
+	# Fallback: Check terrain_requirements property directly
+	var requirements = building_data.get("terrain_requirements")
+
+	# Empty array OR null means any non-water terrain is valid
+	if requirements == null or (requirements is Array and requirements.is_empty()):
+		return true
+
+	# Check if current terrain is in the requirements list
+	if requirements is Array:
+		for req in requirements:
+			if req == terrain_type:
+				return true
 		return false
 
 	return true
+
+
+## Get the current invalidity reason.
+## Story: 3-6-display-placement-validity-indicators
+## @return The current InvalidityReason
+func get_invalidity_reason() -> InvalidityReason:
+	return _current_invalidity_reason
 
 
 ## Check if player can afford the building cost.
@@ -367,18 +442,25 @@ func _create_fallback_ghost() -> Node3D:
 	return ghost
 
 
-## Update ghost preview validity visual (green/red tint).
-## @param is_valid Whether the current position is valid
-func _update_ghost_validity(is_valid: bool) -> void:
+## Update ghost preview validity visual with invalidity reason (Story 3-6).
+## @param reason The InvalidityReason for the current position
+func _update_ghost_validity(reason: InvalidityReason) -> void:
 	if not _ghost_preview:
 		return
 
-	# If ghost has set_valid method, use it
+	var is_valid := (reason == InvalidityReason.NONE)
+
+	# If ghost has set_invalidity_reason method (Story 3-6), use it
+	if _ghost_preview.has_method("set_invalidity_reason"):
+		_ghost_preview.call("set_invalidity_reason", reason)
+		return
+
+	# Fallback: If ghost has set_valid method, use it (backward compatibility)
 	if _ghost_preview.has_method("set_valid"):
 		_ghost_preview.call("set_valid", is_valid)
 		return
 
-	# Fallback: Update material color directly
+	# Final fallback: Update material color directly
 	var material = _ghost_preview.get_meta("material") if _ghost_preview.has_meta("material") else null
 	if material:
 		if is_valid:
@@ -481,6 +563,7 @@ func _cleanup_placement() -> void:
 	current_building_data = null
 	current_preview_hex = Vector2i.ZERO
 	_is_current_hex_valid = false
+	_current_invalidity_reason = InvalidityReason.NONE
 
 	# Remove ghost preview
 	if _ghost_preview and is_instance_valid(_ghost_preview):

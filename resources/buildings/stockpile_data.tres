@@ -12,4 +12,5 @@ footprint_hexes = Array[Vector2i]([Vector2i(0, 0)])
 production_recipe_id = ""
 storage_capacity_bonus = 50
 valid_terrain = Array[String](["grass"])
+terrain_requirements = Array[int]([])
 build_cost = {"wood": 15}
