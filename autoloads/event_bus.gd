@@ -292,6 +292,14 @@ signal building_placed(building: Node, hex_coord: Vector2i)
 ## @param hex_coord The hex coordinate for path cache invalidation (Epic 2 retrospective action item)
 signal building_removed(building: Node, hex_coord: Vector2i)
 
+## Emitted when building placement mode begins (Story 3-4).
+## @param building_data The BuildingData resource for the building to be placed
+signal building_placement_started(building_data: Resource)
+
+## Emitted when building placement mode ends (cancelled or completed).
+## @param placed True if building was placed, false if cancelled
+signal building_placement_ended(placed: bool)
+
 # =============================================================================
 # CAMERA EVENTS
 # =============================================================================
