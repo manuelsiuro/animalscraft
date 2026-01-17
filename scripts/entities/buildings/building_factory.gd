@@ -19,8 +19,8 @@ const BUILDING_SCENES: Dictionary = {
 	"farm": preload("res://scenes/entities/buildings/farm.tscn"),
 	"sawmill": preload("res://scenes/entities/buildings/sawmill.tscn"),
 	"mill": preload("res://scenes/entities/buildings/mill.tscn"),
+	"bakery": preload("res://scenes/entities/buildings/bakery.tscn"),
 	# Future buildings added here as scenes are created:
-	# "bakery": preload("res://scenes/entities/buildings/bakery.tscn"),
 	# "warehouse": preload("res://scenes/entities/buildings/warehouse.tscn"),
 }
 
