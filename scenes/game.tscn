@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://bi7e17bdmd70e"]
+[gd_scene load_steps=10 format=3 uid="uid://bi7e17bdmd70e"]
 
 [ext_resource type="Script" uid="uid://8oy57wwaggvh" path="res://scripts/game.gd" id="1"]
 [ext_resource type="Script" uid="uid://b30xd54sjhbdr" path="res://scripts/world/world_manager.gd" id="2_lnu2h"]
@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" uid="uid://building_menu_panel" path="res://scenes/ui/building_menu_panel.tscn" id="6_building_menu"]
 [ext_resource type="PackedScene" uid="uid://csax5pnb2h4jm" path="res://scenes/ui/building_info_panel.tscn" id="7_building_info_panel"]
 [ext_resource type="PackedScene" uid="uid://worker_selection_overlay" path="res://scenes/ui/worker_selection_overlay.tscn" id="8_worker_selection_overlay"]
+[ext_resource type="PackedScene" uid="uid://resource_bar_hud" path="res://scenes/ui/hud/resource_bar_hud.tscn" id="9_resource_bar_hud"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -23,6 +24,8 @@ script = ExtResource("1")
 script = ExtResource("2_lnu2h")
 
 [node name="UI" type="CanvasLayer" parent="."]
+
+[node name="ResourceBarHUD" parent="UI" instance=ExtResource("9_resource_bar_hud")]
 
 [node name="AnimalStatsPanel" parent="UI" instance=ExtResource("4_stats_panel")]
 
