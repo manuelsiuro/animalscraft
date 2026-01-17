@@ -31,6 +31,7 @@ SelectionManager="*res://scripts/systems/selection/selection_manager.gd"
 ResourceManager="*res://autoloads/resource_manager.gd"
 AssignmentManager="*res://autoloads/assignment_manager.gd"
 BuildingPlacementManager="*res://autoloads/building_placement_manager.gd"
+RecipeManager="*res://autoloads/recipe_manager.gd"
 
 [display]
 

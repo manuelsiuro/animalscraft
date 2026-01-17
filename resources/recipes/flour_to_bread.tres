@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="RecipeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/production/recipe_data.gd" id="1_recipe_data"]
+
+[resource]
+script = ExtResource("1_recipe_data")
+recipe_id = "flour_to_bread"
+display_name = "Bake Bread"
+description = "The bakery combines flour with heat to produce bread."
+inputs = [{"resource_id": "flour", "amount": 1}]
+outputs = [{"resource_id": "bread", "amount": 1}]
+production_time = 4.0
