@@ -33,6 +33,9 @@ var _mock_tiles: Dictionary = {}
 # =============================================================================
 
 func before_each() -> void:
+	# Clear HexGrid occupancy from previous tests
+	HexGrid.clear_occupancy()
+
 	# Create mock world manager
 	_world_manager = _create_mock_world_manager()
 	add_child(_world_manager)
@@ -56,6 +59,9 @@ func after_each() -> void:
 	if is_instance_valid(_world_manager):
 		_world_manager.queue_free()
 	_mock_tiles.clear()
+
+	# Clear HexGrid occupancy to prevent test pollution
+	HexGrid.clear_occupancy()
 
 	await wait_frames(1)
 
