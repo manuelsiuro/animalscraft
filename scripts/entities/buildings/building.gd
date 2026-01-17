@@ -45,6 +45,10 @@ var _production_active: bool = false
 ## Note: Using Node type to avoid load order issues with class_name
 var _gatherer: Node = null
 
+## ProcessorComponent for recipe-based production - optional, only for PROCESSOR buildings (Story 4-4)
+## Note: Using Node type to avoid load order issues with class_name
+var _processor: Node = null
+
 # =============================================================================
 # SELECTION VISUAL (same pattern as Animal)
 # =============================================================================
@@ -89,6 +93,12 @@ func initialize(hex: HexCoord, building_data: BuildingData) -> void:
 		_gatherer = get_node_or_null("GathererComponent")
 		if _gatherer and _gatherer.has_method("initialize"):
 			_gatherer.initialize(self, building_data.output_resource_id, building_data.production_time)
+
+	# Initialize ProcessorComponent for PROCESSOR buildings (Story 4-4)
+	if building_data and building_data.is_producer():
+		_processor = get_node_or_null("ProcessorComponent")
+		if _processor and _processor.has_method("initialize"):
+			_processor.initialize(self, building_data.production_recipe_id)
 
 	# Mark hex as occupied
 	_mark_hex_occupied()
@@ -185,7 +195,7 @@ func _on_selection_changed(is_selected_state: bool) -> void:
 
 
 ## Handle worker_added signal from WorkerSlotComponent (Story 3-8)
-## Starts production for the worker on GathererComponent if available.
+## Starts production for the worker on GathererComponent or ProcessorComponent if available.
 func _on_worker_added(animal: Animal) -> void:
 	var animal_id := animal.get_animal_id() if animal.has_method("get_animal_id") else "unknown"
 	GameLogger.debug("Building", "Worker assigned: %s" % animal_id)
@@ -200,9 +210,19 @@ func _on_worker_added(animal: Animal) -> void:
 			EventBus.production_started.emit(self)
 			GameLogger.info("Building", "Production started at %s" % get_building_id())
 
+	# Start production on ProcessorComponent (Story 4-4)
+	if _processor and _processor.is_initialized():
+		_processor.start_worker(animal)
+
+		# Emit production_started on first worker
+		if not _production_active:
+			_production_active = true
+			EventBus.production_started.emit(self)
+			GameLogger.info("Building", "Production started at %s" % get_building_id())
+
 
 ## Handle worker_removed signal from WorkerSlotComponent (Story 3-8)
-## Stops production for the worker on GathererComponent if available.
+## Stops production for the worker on GathererComponent or ProcessorComponent if available.
 func _on_worker_removed(animal: Animal) -> void:
 	var animal_id := animal.get_animal_id() if animal and animal.has_method("get_animal_id") else "unknown"
 	GameLogger.debug("Building", "Worker unassigned: %s" % animal_id)
@@ -212,6 +232,16 @@ func _on_worker_removed(animal: Animal) -> void:
 		_gatherer.stop_worker(animal)
 
 		# Emit production_halted when last worker leaves (AC4)
+		if _worker_slots and _worker_slots.get_worker_count() == 0:
+			_production_active = false
+			EventBus.production_halted.emit(self, "no_workers")
+			GameLogger.info("Building", "Production halted at %s - no workers" % get_building_id())
+
+	# Stop production on ProcessorComponent (Story 4-4)
+	if _processor and _processor.is_initialized():
+		_processor.stop_worker(animal)
+
+		# Emit production_halted when last worker leaves
 		if _worker_slots and _worker_slots.get_worker_count() == 0:
 			_production_active = false
 			EventBus.production_halted.emit(self, "no_workers")
@@ -307,6 +337,18 @@ func is_gatherer() -> bool:
 	return _gatherer != null and _gatherer.is_initialized()
 
 
+## Get the processor component for external access (Story 4-4).
+## @return ProcessorComponent (as Node) or null if not a processor building
+func get_processor() -> Node:
+	return _processor
+
+
+## Check if this building is a processor (transforms resources via recipes) (Story 4-4).
+## @return true if this building has a ProcessorComponent
+func is_processor() -> bool:
+	return _processor != null and _processor.is_initialized()
+
+
 ## Check if production is currently active (Story 3-8).
 ## @return true if at least one worker is producing
 func is_production_active() -> bool:
@@ -344,6 +386,11 @@ func cleanup() -> void:
 	if _gatherer:
 		_gatherer.cleanup()
 		_gatherer = null
+
+	# 4b. Clean up ProcessorComponent (Story 4-4)
+	if _processor:
+		_processor.cleanup()
+		_processor = null
 
 	# 5. Unmark hex occupancy
 	_unmark_hex_occupied()

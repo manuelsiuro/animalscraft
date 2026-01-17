@@ -1,8 +1,9 @@
-[gd_scene load_steps=6 format=3 uid="uid://ds0kwjd18iyt1"]
+[gd_scene load_steps=7 format=3 uid="uid://ds0kwjd18iyt1"]
 
 [ext_resource type="Script" path="res://scripts/entities/buildings/building.gd" id="1_building"]
 [ext_resource type="Script" path="res://scripts/entities/animals/components/selectable_component.gd" id="2_selectable"]
 [ext_resource type="Script" path="res://scripts/entities/buildings/components/worker_slot_component.gd" id="3_worker_slots"]
+[ext_resource type="Script" path="res://scripts/entities/buildings/components/processor_component.gd" id="4_processor"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_mill"]
 size = Vector3(1, 1, 1)
@@ -25,3 +26,6 @@ script = ExtResource("2_selectable")
 
 [node name="WorkerSlotComponent" type="Node" parent="."]
 script = ExtResource("3_worker_slots")
+
+[node name="ProcessorComponent" type="Node" parent="."]
+script = ExtResource("4_processor")
