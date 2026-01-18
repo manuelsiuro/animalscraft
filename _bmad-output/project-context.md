@@ -106,6 +106,32 @@ var world_pos: Vector3 = ray_origin + ray_direction * t
 - Signal naming: `{noun}_{past_tense_verb}` (e.g., `territory_claimed`)
 - Never directly reference other systems - emit signals instead
 
+#### Building Component Patterns (Story 4-4)
+
+**GathererComponent vs ProcessorComponent:**
+| Feature | GathererComponent | ProcessorComponent |
+|---------|-------------------|-------------------|
+| Purpose | Simple production (Farm→Wheat) | Recipe transformation (Wheat→Flour) |
+| Inputs | None | Recipe inputs consumed |
+| Recipe | N/A | Uses RecipeManager.can_craft() |
+| State | `_worker_timers`, `_paused_workers` | + `_waiting_for_inputs` |
+
+**ProcessorComponent State Machine:**
+```
+start_worker → [can_craft?] → YES → _worker_timers (producing)
+                           → NO  → _waiting_for_inputs
+
+_process → timer complete → [storage full?] → YES → _paused_workers
+                                           → NO  → produce outputs
+                                                 → [can_craft?] → NO → _waiting_for_inputs
+```
+
+**Key Rules:**
+- Building.gd owns `production_started`/`production_halted` signal emission
+- ProcessorComponent handles internal state only
+- Timer decrement happens AFTER production success (preserves progress on failure)
+- Multiple waiting workers transition in same frame when resources available (AC4)
+
 ### Testing Rules (GUT Framework)
 
 #### Test File Organization
@@ -151,7 +177,7 @@ world_manager.set_script(script_mock)
 #### Test Coverage Requirements
 - All new functionality must have tests
 - Test acceptance criteria from stories
-- Current baseline: 348+ tests passing
+- Current baseline: 1518+ tests passing (as of Story 4-4)
 
 ### Code Quality & Style Rules
 
@@ -288,4 +314,4 @@ Before starting implementation:
 
 ---
 
-_Last Updated: 2026-01-13_
+_Last Updated: 2026-01-18_

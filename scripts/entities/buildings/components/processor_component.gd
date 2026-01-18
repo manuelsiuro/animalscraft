@@ -41,8 +41,8 @@ var _waiting_for_inputs: Dictionary = {}
 ## Mapping of animal_id to Node reference for signal emission
 var _worker_references: Dictionary = {}
 
-## Track if production is active (for signal emission)
-var _production_active: bool = false
+## NOTE: Production activity signals (production_started, production_halted) are emitted by
+## Building.gd, not ProcessorComponent. This avoids duplicate state tracking.
 
 # =============================================================================
 # LIFECYCLE
@@ -100,28 +100,21 @@ func _process(delta: float) -> void:
 	_update_worker_timers(delta)
 
 
-## Check waiting workers and transition to producing if inputs available
+## Check waiting workers and transition to producing if inputs available (AC4: start immediately)
 func _check_waiting_workers() -> void:
 	if _waiting_for_inputs.is_empty():
 		return
 
-	# Check if can craft now
-	if not RecipeManager.can_craft(_recipe.recipe_id):
-		return
+	# Transition ALL waiting workers that can start while resources available (AC4 fix)
+	# Use while loop to process multiple workers in same frame
+	while not _waiting_for_inputs.is_empty() and RecipeManager.can_craft(_recipe.recipe_id):
+		var waiting_ids: Array = _waiting_for_inputs.keys()
+		var animal_id: String = waiting_ids[0]
+		_waiting_for_inputs.erase(animal_id)
+		_worker_timers[animal_id] = 0.0
+		GameLogger.debug("ProcessorComponent", "Worker %s starting - inputs now available" % animal_id)
 
-	# Get first waiting worker to transition (only one at a time to consume inputs properly)
-	var waiting_ids: Array = _waiting_for_inputs.keys()
-	if waiting_ids.is_empty():
-		return
-
-	var animal_id: String = waiting_ids[0]
-	_waiting_for_inputs.erase(animal_id)
-	_worker_timers[animal_id] = 0.0
-	GameLogger.debug("ProcessorComponent", "Worker %s starting - inputs now available" % animal_id)
-
-	# Track production state (Building already emitted production_started when worker was added)
-	if not _production_active and _worker_timers.size() == 1:
-		_production_active = true
+	# Note: Building.gd emits production_started when worker is added
 
 
 ## Update timers for all active workers
@@ -135,8 +128,11 @@ func _update_worker_timers(delta: float) -> void:
 
 		# Check if production cycle complete
 		if _worker_timers[animal_id] >= _recipe.production_time:
-			_worker_timers[animal_id] -= _recipe.production_time  # Carry over excess to prevent drift
-			_complete_production(animal_id)
+			# Only decrement timer if production actually succeeded (AC6 fix)
+			if _complete_production(animal_id):
+				# Check key still exists (worker may have transitioned to waiting state)
+				if _worker_timers.has(animal_id):
+					_worker_timers[animal_id] -= _recipe.production_time  # Carry over excess
 
 # =============================================================================
 # WORKER MANAGEMENT
@@ -169,10 +165,7 @@ func start_worker(animal: Node) -> void:
 		# Start production timer
 		_worker_timers[animal_id] = 0.0
 		GameLogger.debug("ProcessorComponent", "Worker %s started production for %s" % [animal_id, _recipe.recipe_id])
-
-		# Track production state (Building emits production_started signal)
-		if not _production_active:
-			_production_active = true
+		# Note: Building.gd emits production_started signal
 	else:
 		# Enter waiting state
 		_waiting_for_inputs[animal_id] = true
@@ -201,9 +194,7 @@ func stop_worker(animal: Node) -> void:
 
 	GameLogger.debug("ProcessorComponent", "Worker %s stopped production (no partial resource)" % animal_id)
 
-	# Track production state (Building emits production_halted signal for no_workers)
-	if _worker_timers.is_empty() and _waiting_for_inputs.is_empty():
-		_production_active = false
+	# Note: Building.gd emits production_halted("no_workers") when last worker is removed
 
 # =============================================================================
 # PRODUCTION
@@ -212,7 +203,8 @@ func stop_worker(animal: Node) -> void:
 ## Complete a production cycle for a worker.
 ## Consumes inputs atomically and produces outputs.
 ## @param animal_id The ID of the animal that completed production
-func _complete_production(animal_id: String) -> void:
+## @return true if production succeeded, false if blocked (storage full, race condition)
+func _complete_production(animal_id: String) -> bool:
 	# Check if output storage is full (any output resource)
 	for output in _recipe.outputs:
 		var resource_id: String = output.get("resource_id", "")
@@ -221,7 +213,7 @@ func _complete_production(animal_id: String) -> void:
 			GameLogger.debug("ProcessorComponent", "Production paused for %s - %s storage full" % [animal_id, resource_id])
 			if is_instance_valid(EventBus) and is_instance_valid(_building):
 				EventBus.production_halted.emit(_building, "storage_full")
-			return
+			return false  # Production blocked - don't decrement timer (AC6)
 
 	# Consume ALL inputs atomically (all-or-nothing)
 	for input in _recipe.inputs:
@@ -233,7 +225,9 @@ func _complete_production(animal_id: String) -> void:
 			_waiting_for_inputs[animal_id] = true
 			_worker_timers.erase(animal_id)
 			GameLogger.debug("ProcessorComponent", "Input consumed by another - entering wait state")
-			return
+			if is_instance_valid(EventBus) and is_instance_valid(_building):
+				EventBus.production_halted.emit(_building, "no_inputs")
+			return false  # Production blocked
 
 	# Produce ALL outputs
 	for output in _recipe.outputs:
@@ -257,6 +251,11 @@ func _complete_production(animal_id: String) -> void:
 		_waiting_for_inputs[animal_id] = true
 		_worker_timers.erase(animal_id)
 		GameLogger.debug("ProcessorComponent", "Worker %s waiting for inputs after production" % animal_id)
+		# Emit production_halted for input depletion (AC10 fix)
+		if is_instance_valid(EventBus) and is_instance_valid(_building):
+			EventBus.production_halted.emit(_building, "no_inputs")
+
+	return true  # Production succeeded
 
 
 ## Handle gathering resumed signal from ResourceManager.
@@ -418,4 +417,3 @@ func cleanup() -> void:
 	_building = null
 	_recipe = null
 	_initialized = false
-	_production_active = false
