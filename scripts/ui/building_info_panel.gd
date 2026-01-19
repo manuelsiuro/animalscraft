@@ -2,8 +2,14 @@
 ## Listens to EventBus for selection changes and updates in real-time.
 ## Mirrors AnimalStatsPanel architecture for consistency.
 ##
+## Features:
+## - Worker assignment/unassignment (Story 3-10)
+## - PROCESSOR building input requirements display (Story 4-5)
+## - Real-time production progress bar with cozy styling (Story 4-6)
+## - Storage capacity display with color-coded warnings (Story 4-6)
+##
 ## Architecture: scripts/ui/building_info_panel.gd
-## Story: 3-9-implement-building-selection
+## Stories: 3-9, 3-10, 4-5, 4-6
 class_name BuildingInfoPanel
 extends Control
 
@@ -23,6 +29,20 @@ extends Control
 @onready var _worker_icons_container: HBoxContainer = $PanelContainer/MarginContainer/VBoxContainer/WorkerSection/WorkerIconsContainer
 @onready var _assign_worker_button: Button = $PanelContainer/MarginContainer/VBoxContainer/WorkerSection/AssignWorkerButton
 
+# PROCESSOR building UI elements (Story 4-5)
+@onready var _inputs_section: Control = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/InputsSection
+@onready var _inputs_container: VBoxContainer = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/InputsSection/InputsContainer
+@onready var _recipe_flow_row: Control = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/RecipeFlowRow
+@onready var _recipe_flow_label: Label = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/RecipeFlowRow/RecipeFlowLabel
+
+# Progress bar and storage display UI elements (Story 4-6)
+@onready var _progress_bar_row: Control = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/ProgressBarRow
+@onready var _production_progress_bar: ProgressBar = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/ProgressBarRow/ProductionProgressBar
+@onready var _progress_percent_label: Label = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/ProgressBarRow/ProgressPercentLabel
+@onready var _storage_row: Control = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/StorageRow
+@onready var _output_storage_icon: Label = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/StorageRow/OutputStorageIcon
+@onready var _output_storage_label: Label = $PanelContainer/MarginContainer/VBoxContainer/ProductionSection/StorageRow/OutputStorageLabel
+
 # =============================================================================
 # CONSTANTS
 # =============================================================================
@@ -31,9 +51,26 @@ extends Control
 const STATUS_IDLE := "Idle (No Workers)"
 const STATUS_ACTIVE := "Active"
 const STATUS_PAUSED := "Paused (Storage Full)"
+## PROCESSOR-specific status strings (Story 4-5)
+const STATUS_WAITING := "Waiting for Inputs"
+const STATUS_PRODUCING := "Producing %s"
+
+## Storage display color constants (Story 4-6)
+const COLOR_STORAGE_NORMAL := Color(1, 0.95, 0.9, 1)  # Light/white
+const COLOR_STORAGE_WARNING := Color(0.9, 0.7, 0.3, 1)  # Orange
+const COLOR_STORAGE_FULL := Color(0.9, 0.3, 0.3, 1)  # Red
 
 ## Maximum worker icons to display before showing overflow indicator (M4 fix)
 const MAX_WORKER_ICONS_DISPLAY := 4
+
+## Resource icons for input/output display (Story 4-5)
+const RESOURCE_ICONS := {
+	"wheat": "🌾",
+	"wood": "🪵",
+	"flour": "🌸",
+	"bread": "🍞",
+	"stone": "🪨",
+}
 
 # =============================================================================
 # STATE
@@ -47,6 +84,9 @@ var _cached_worker_slots: WorkerSlotComponent = null
 
 ## Reference to WorkerSelectionOverlay (assigned from game.tscn or found at runtime)
 var _worker_selection_overlay: Control = null
+
+## Current storage display color (tracked for testing) - Story 4-6
+var _current_storage_color: Color = COLOR_STORAGE_NORMAL
 
 # =============================================================================
 # LIFECYCLE
@@ -66,6 +106,9 @@ func _ready() -> void:
 		EventBus.production_halted.connect(_on_production_halted)
 		EventBus.resource_gathering_paused.connect(_on_gathering_paused)
 		EventBus.resource_gathering_resumed.connect(_on_gathering_resumed)
+		# PROCESSOR-specific signals for real-time input availability updates (Story 4-5)
+		EventBus.resource_changed.connect(_on_resource_changed)
+		EventBus.production_completed.connect(_on_production_completed_for_display)
 
 	# Connect assign worker button (Story 3-10)
 	if _assign_worker_button:
@@ -74,7 +117,31 @@ func _ready() -> void:
 	# Find WorkerSelectionOverlay (deferred to allow scene to initialize)
 	call_deferred("_find_worker_selection_overlay")
 
+	# Apply cozy theme styling to progress bar (Story 4-6, Task 1.6)
+	_apply_progress_bar_styling()
+
 	GameLogger.info("UI", "BuildingInfoPanel initialized")
+
+
+## Process function for real-time progress bar updates (Story 4-6)
+func _process(_delta: float) -> void:
+	# Early exit checks (cheap) - AC12: no performance impact
+	if not visible:
+		return
+	if not is_instance_valid(_current_building):
+		return
+
+	# Type check only if we pass visibility checks
+	var data := _current_building.get_data()
+	if not data or not data.is_producer():
+		return
+
+	var processor := _current_building.get_processor()
+	if not processor or not processor.is_initialized():
+		return
+
+	# Only update progress bar (not full display refresh) - AC2, AC12
+	_update_progress_bar_display(processor)
 
 
 func _exit_tree() -> void:
@@ -97,6 +164,11 @@ func _exit_tree() -> void:
 			EventBus.resource_gathering_paused.disconnect(_on_gathering_paused)
 		if EventBus.resource_gathering_resumed.is_connected(_on_gathering_resumed):
 			EventBus.resource_gathering_resumed.disconnect(_on_gathering_resumed)
+		# Disconnect PROCESSOR-specific signals (Story 4-5)
+		if EventBus.resource_changed.is_connected(_on_resource_changed):
+			EventBus.resource_changed.disconnect(_on_resource_changed)
+		if EventBus.production_completed.is_connected(_on_production_completed_for_display):
+			EventBus.production_completed.disconnect(_on_production_completed_for_display)
 
 # =============================================================================
 # PUBLIC API
@@ -161,6 +233,59 @@ func get_production_status() -> String:
 		return _status_label.text
 	return ""
 
+
+## Check if inputs section is visible (for testing) - Story 4-5
+func is_inputs_section_visible() -> bool:
+	return _inputs_section != null and _inputs_section.visible
+
+
+## Get the recipe flow text (for testing) - Story 4-5
+func get_recipe_flow_text() -> String:
+	if _recipe_flow_label:
+		return _recipe_flow_label.text
+	return ""
+
+
+## Get input requirement count (for testing) - Story 4-5
+func get_input_requirements_count() -> int:
+	if not _inputs_container:
+		return 0
+	return _inputs_container.get_child_count()
+
+
+## Check if recipe flow row is visible (for testing) - Story 4-5
+func is_recipe_flow_visible() -> bool:
+	return _recipe_flow_row != null and _recipe_flow_row.visible
+
+
+## Get progress bar value (0-100) (for testing) - Story 4-6
+func get_progress_bar_value() -> float:
+	if _production_progress_bar:
+		return _production_progress_bar.value
+	return 0.0
+
+
+## Check if progress bar is visible (for testing) - Story 4-6
+func is_progress_bar_visible() -> bool:
+	return _progress_bar_row != null and _progress_bar_row.visible
+
+
+## Get storage display text (for testing) - Story 4-6
+func get_storage_display_text() -> String:
+	if _output_storage_label:
+		return _output_storage_label.text
+	return ""
+
+
+## Get storage display color (for testing) - Story 4-6
+func get_storage_display_color() -> Color:
+	return _current_storage_color
+
+
+## Check if storage row is visible (for testing) - Story 4-6
+func is_storage_row_visible() -> bool:
+	return _storage_row != null and _storage_row.visible
+
 # =============================================================================
 # SIGNAL HANDLERS
 # =============================================================================
@@ -211,6 +336,36 @@ func _on_gathering_resumed(resource_id: String) -> void:
 		var data := _current_building.get_data()
 		if data and data.output_resource_id == resource_id:
 			_update_display()
+
+
+## Handle resource change for PROCESSOR input availability updates (AC4) - Story 4-5
+func _on_resource_changed(resource_id: String, _new_amount: int) -> void:
+	# Only update if showing a PROCESSOR building
+	if not is_instance_valid(_current_building):
+		return
+
+	var data := _current_building.get_data()
+	if not data or not data.is_producer():
+		return
+
+	# Get processor component
+	var processor := _current_building.get_processor()
+	if not processor or not processor.is_initialized():
+		return
+
+	# Only update if this resource is an input for our recipe
+	var inputs: Array[Dictionary] = processor.get_input_requirements()
+	for input in inputs:
+		if input.get("resource_id", "") == resource_id:
+			_update_display()
+			break
+
+
+## Handle production completed for display refresh (Story 4-5)
+func _on_production_completed_for_display(building: Node, _output_type: String) -> void:
+	# Only update if it's the currently displayed building
+	if is_instance_valid(_current_building) and building == _current_building:
+		_update_display()
 
 # =============================================================================
 # PRIVATE METHODS
@@ -281,17 +436,30 @@ func _update_workers_display(data: BuildingData) -> void:
 		_workers_label.text = "Workers: 0/%d" % data.max_workers
 
 
-## Update production status display (for gatherer buildings)
+## Update production status display (for gatherer AND processor buildings - Story 4-5)
 func _update_production_display(data: BuildingData) -> void:
 	if not _production_section:
 		return
 
-	# Only show production section for gatherer buildings
-	if not data.is_gatherer():
+	# Show production section for BOTH gatherer AND processor buildings (AC11)
+	if not data.is_gatherer() and not data.is_producer():
 		_production_section.visible = false
+		_hide_processor_ui()
 		return
 
 	_production_section.visible = true
+
+	# Branch based on building type (Story 4-5)
+	if data.is_producer():
+		_update_processor_display(data)
+	else:
+		_update_gatherer_display(data)
+
+
+## Update display for GATHERER buildings (Farm, Sawmill)
+func _update_gatherer_display(data: BuildingData) -> void:
+	# Hide PROCESSOR-specific UI (AC9)
+	_hide_processor_ui()
 
 	# Output resource
 	if _output_label:
@@ -303,11 +471,63 @@ func _update_production_display(data: BuildingData) -> void:
 
 	# Production status
 	if _status_label:
-		_status_label.text = _get_production_status_text(data)
+		_status_label.text = _get_gatherer_status_text(data)
 
 
-## Get production status text based on building state
-func _get_production_status_text(data: BuildingData) -> String:
+## Update display for PROCESSOR buildings (Mill, Bakery) - Story 4-5, 4-6
+func _update_processor_display(data: BuildingData) -> void:
+	# Get processor component
+	var processor := _current_building.get_processor() if _current_building else null
+	if not processor or not processor.is_initialized():
+		_hide_processor_ui()
+		return
+
+	# Show inputs section (AC1, AC11)
+	if _inputs_section:
+		_inputs_section.visible = true
+
+	# Update input requirements (AC2, AC3)
+	_update_inputs_display(processor)
+
+	# Update recipe flow display (AC7, AC8)
+	_update_recipe_flow_display(processor)
+
+	# Update progress bar display (Story 4-6: AC1, AC3)
+	_update_progress_bar_display(processor)
+
+	# Update storage display (Story 4-6: AC4, AC5, AC6)
+	_update_storage_display(processor)
+
+	# Update output label from recipe
+	var outputs: Array[Dictionary] = processor.get_output_types()
+	if _output_label and outputs.size() > 0:
+		var output_name: String = outputs[0].get("resource_id", "").capitalize()
+		_output_label.text = output_name
+
+	# Cycle time from recipe
+	if _cycle_label:
+		_cycle_label.text = "%.1fs" % processor.get_production_time()
+
+	# Production status (AC5, AC6, AC10)
+	if _status_label:
+		_status_label.text = _get_processor_status_text(processor)
+
+
+## Hide PROCESSOR-specific UI elements (Story 4-6: also hide progress bar and storage)
+func _hide_processor_ui() -> void:
+	if _inputs_section:
+		_inputs_section.visible = false
+	if _recipe_flow_row:
+		_recipe_flow_row.visible = false
+	# Story 4-6: Hide progress bar and storage row for GATHERER buildings (AC9)
+	if _progress_bar_row:
+		_progress_bar_row.visible = false
+	if _storage_row:
+		_storage_row.visible = false
+
+
+## Get production status text for GATHERER buildings
+func _get_gatherer_status_text(data: BuildingData) -> String:
 	if not _current_building.is_production_active():
 		return STATUS_IDLE
 
@@ -316,6 +536,249 @@ func _get_production_status_text(data: BuildingData) -> String:
 		return STATUS_PAUSED
 
 	return STATUS_ACTIVE
+
+
+## Get production status text for PROCESSOR buildings (AC5, AC6, AC10) - Story 4-5
+func _get_processor_status_text(processor: Node) -> String:
+	# Check worker count first
+	if not _current_building.is_production_active():
+		return STATUS_IDLE
+
+	# Check storage full (any output) - AC10
+	var outputs: Array[Dictionary] = processor.get_output_types()
+	for output in outputs:
+		var resource_id: String = output.get("resource_id", "")
+		if is_instance_valid(ResourceManager) and ResourceManager.is_gathering_paused(resource_id):
+			return STATUS_PAUSED
+
+	# Check waiting for inputs - AC5
+	if processor.get_waiting_worker_count() > 0:
+		return STATUS_WAITING
+
+	# Must be producing - AC6 (get output name)
+	if outputs.size() > 0:
+		var output_name: String = outputs[0].get("resource_id", "").capitalize()
+		return STATUS_PRODUCING % output_name
+
+	return STATUS_ACTIVE
+
+
+## Update input requirements display (AC2, AC3, AC4) - Story 4-5
+func _update_inputs_display(processor: Node) -> void:
+	if not _inputs_container:
+		return
+
+	# Clear existing items
+	for child in _inputs_container.get_children():
+		child.queue_free()
+
+	# Get recipe inputs
+	var inputs: Array[Dictionary] = processor.get_input_requirements()
+	var recipe: RecipeData = processor.get_recipe()
+	if recipe == null:
+		return
+
+	# Create display item for each input
+	for input in inputs:
+		var resource_id: String = input.get("resource_id", "")
+		var amount_required: int = input.get("amount", 0)
+		var amount_available := ResourceManager.get_resource_amount(resource_id) if is_instance_valid(ResourceManager) else 0
+
+		var item := _create_input_requirement_row(resource_id, amount_required, amount_available)
+		_inputs_container.add_child(item)
+
+
+## Create a single input requirement row (AC2, AC3) - Story 4-5
+func _create_input_requirement_row(resource_id: String, amount_required: int, amount_available: int) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+
+	# Resource icon
+	var icon := Label.new()
+	icon.text = RESOURCE_ICONS.get(resource_id, "📦")
+	icon.add_theme_font_size_override("font_size", 14)
+	icon.custom_minimum_size = Vector2(20, 0)
+	row.add_child(icon)
+
+	# "Needs:" label
+	var needs_label := Label.new()
+	needs_label.text = "Needs:"
+	needs_label.add_theme_font_size_override("font_size", 12)
+	needs_label.add_theme_color_override("font_color", Color(0.8, 0.75, 0.7, 1))
+	row.add_child(needs_label)
+
+	# Amount and resource name
+	var amount_label := Label.new()
+	amount_label.text = "%d %s" % [amount_required, resource_id.capitalize()]
+	amount_label.add_theme_font_size_override("font_size", 12)
+	amount_label.add_theme_color_override("font_color", Color(1, 0.95, 0.9, 1))
+	amount_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(amount_label)
+
+	# Status indicator (AC2, AC3)
+	var status_label := Label.new()
+	if amount_available >= amount_required:
+		# Available (green checkmark)
+		status_label.text = "✓ Available"
+		status_label.add_theme_color_override("font_color", Color(0.4, 0.8, 0.4, 1))
+	else:
+		# Missing (red X with amount needed)
+		var short := amount_required - amount_available
+		status_label.text = "✗ Need %d more" % short
+		status_label.add_theme_color_override("font_color", Color(0.9, 0.3, 0.3, 1))
+	status_label.add_theme_font_size_override("font_size", 12)
+	row.add_child(status_label)
+
+	return row
+
+
+## Update recipe flow display "2 Wheat → 1 Flour (3.0s)" (AC7, AC8) - Story 4-5
+func _update_recipe_flow_display(processor: Node) -> void:
+	if not _recipe_flow_row or not _recipe_flow_label:
+		return
+
+	_recipe_flow_row.visible = true
+
+	var inputs: Array[Dictionary] = processor.get_input_requirements()
+	var outputs: Array[Dictionary] = processor.get_output_types()
+	var production_time: float = processor.get_production_time()
+
+	# Build input string
+	var input_parts: Array[String] = []
+	for input in inputs:
+		var resource_id: String = input.get("resource_id", "")
+		var amount: int = input.get("amount", 0)
+		input_parts.append("%d %s" % [amount, resource_id.capitalize()])
+	var input_str := " + ".join(input_parts) if input_parts.size() > 1 else (input_parts[0] if input_parts.size() > 0 else "")
+
+	# Build output string
+	var output_parts: Array[String] = []
+	for output in outputs:
+		var resource_id: String = output.get("resource_id", "")
+		var amount: int = output.get("amount", 0)
+		output_parts.append("%d %s" % [amount, resource_id.capitalize()])
+	var output_str := " + ".join(output_parts) if output_parts.size() > 1 else (output_parts[0] if output_parts.size() > 0 else "")
+
+	# Format: "2 Wheat → 1 Flour (3.0s)"
+	_recipe_flow_label.text = "%s → %s (%.1fs)" % [input_str, output_str, production_time]
+
+
+# =============================================================================
+# PROGRESS BAR AND STORAGE DISPLAY (Story 4-6)
+# =============================================================================
+
+## Apply cozy theme styling to the progress bar (Task 1.6)
+func _apply_progress_bar_styling() -> void:
+	if not _production_progress_bar:
+		return
+
+	# Fill style - warm green matching cozy game theme
+	var fill_style := StyleBoxFlat.new()
+	fill_style.bg_color = Color(0.4, 0.7, 0.3, 1)  # Warm green
+	fill_style.corner_radius_top_left = 4
+	fill_style.corner_radius_top_right = 4
+	fill_style.corner_radius_bottom_left = 4
+	fill_style.corner_radius_bottom_right = 4
+	_production_progress_bar.add_theme_stylebox_override("fill", fill_style)
+
+	# Background style - dark with transparency
+	var bg_style := StyleBoxFlat.new()
+	bg_style.bg_color = Color(0.2, 0.2, 0.2, 0.8)
+	bg_style.corner_radius_top_left = 4
+	bg_style.corner_radius_top_right = 4
+	bg_style.corner_radius_bottom_left = 4
+	bg_style.corner_radius_bottom_right = 4
+	_production_progress_bar.add_theme_stylebox_override("background", bg_style)
+
+
+## Update progress bar display for PROCESSOR buildings (AC1, AC2, AC3, AC7, AC8, AC10)
+func _update_progress_bar_display(processor: Node) -> void:
+	if not _progress_bar_row or not _production_progress_bar or not _progress_percent_label:
+		return
+
+	# Show progress bar row for PROCESSOR
+	_progress_bar_row.visible = true
+
+	# Get max progress across all workers (AC3)
+	var max_progress := _get_max_worker_progress(processor)
+
+	# Set progress bar value (0-100) (AC1, AC4)
+	var progress_percent := max_progress * 100.0
+	_production_progress_bar.value = progress_percent
+
+	# Update percentage label text (AC8 - shows 0% when no workers or all waiting)
+	_progress_percent_label.text = "%d%%" % int(progress_percent)
+
+
+## Get maximum progress across all producing workers (AC3)
+func _get_max_worker_progress(processor: Node) -> float:
+	var max_progress := 0.0
+
+	if not is_instance_valid(_current_building):
+		return 0.0
+
+	var slots := _current_building.get_worker_slots()
+	if not slots:
+		return 0.0
+
+	var workers: Array[Animal] = slots.get_workers()
+	for worker in workers:
+		if not is_instance_valid(worker):
+			continue
+		# Skip workers that are waiting (not producing) - they have no progress
+		if processor.is_worker_waiting(worker):
+			continue
+
+		var progress: float = processor.get_worker_progress(worker)
+		if progress > max_progress:
+			max_progress = progress
+
+	return max_progress
+
+
+## Update storage display for PROCESSOR buildings (AC4, AC5, AC6)
+## Note: Storage updates on events (selection, resource_changed), not every frame - intentional for performance
+func _update_storage_display(processor: Node) -> void:
+	if not _storage_row or not _output_storage_label:
+		return
+
+	_storage_row.visible = true
+
+	var outputs: Array[Dictionary] = processor.get_output_types()
+	if outputs.is_empty():
+		_storage_row.visible = false
+		return
+
+	var resource_id: String = outputs[0].get("resource_id", "")
+	var current := ResourceManager.get_resource_amount(resource_id) if is_instance_valid(ResourceManager) else 0
+
+	# Get capacity from ResourceManager (uses resource data's max_stack_size)
+	var capacity := GameConstants.DEFAULT_VILLAGE_STORAGE_CAPACITY
+	if is_instance_valid(ResourceManager) and ResourceManager.has_method("get_storage_limit"):
+		capacity = ResourceManager.get_storage_limit(resource_id)
+
+	# Icon (AC4)
+	if _output_storage_icon:
+		_output_storage_icon.text = RESOURCE_ICONS.get(resource_id, "📦")
+
+	# Calculate fill percentage
+	var fill_percent := 0.0
+	if capacity > 0:
+		fill_percent = float(current) / float(capacity) * 100.0
+
+	# Format and color based on fill level (AC4, AC5, AC6)
+	var display_text := "%s: %d/%d" % [resource_id.capitalize(), current, capacity]
+	var display_color := COLOR_STORAGE_NORMAL
+
+	if fill_percent >= 100.0:
+		display_text += " FULL"
+		display_color = COLOR_STORAGE_FULL
+	elif fill_percent >= 80.0:
+		display_color = COLOR_STORAGE_WARNING
+
+	_output_storage_label.text = display_text
+	_output_storage_label.add_theme_color_override("font_color", display_color)
+	_current_storage_color = display_color  # Track for testing API
 
 
 # =============================================================================
@@ -333,12 +796,13 @@ func _find_worker_selection_overlay() -> void:
 
 
 ## Update worker section visibility and button state (AC1, AC2, AC11)
+## Updated Story 4-5: Show worker section for BOTH gatherer AND processor buildings
 func _update_worker_section(data: BuildingData) -> void:
 	if not _worker_section:
 		return
 
-	# AC11: Only show worker section for gatherer buildings
-	if not data.is_gatherer():
+	# Show worker section for gatherer AND processor buildings (Story 4-5)
+	if not data.is_gatherer() and not data.is_producer():
 		_worker_section.visible = false
 		return
 
