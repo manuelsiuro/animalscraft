@@ -37,6 +37,9 @@ var _fog_of_war: FogOfWar
 ## Pathfinding manager (Story 2.6 - for animal movement)
 var _pathfinding: PathfindingManager
 
+## Wild herd manager (Story 5.2 - for wild animal herds)
+var _wild_herd_manager: WildHerdManager
+
 # =============================================================================
 # SIGNALS
 # =============================================================================
@@ -81,6 +84,13 @@ func _ready() -> void:
 	_pathfinding.name = "PathfindingManager"
 	add_child(_pathfinding)
 	_pathfinding.initialize(self)
+
+	# Create and initialize wild herd manager (Story 5.2)
+	_wild_herd_manager = WildHerdManager.new()
+	_wild_herd_manager.name = "WildHerdManager"
+	add_child(_wild_herd_manager)
+	_wild_herd_manager.initialize(self)
+	# Note: spawn_initial_herds() will be called later when player start is determined
 
 
 # =============================================================================
@@ -246,6 +256,13 @@ func get_territory_manager() -> TerritoryManager:
 ## @return The PathfindingManager instance
 func get_pathfinding_manager() -> PathfindingManager:
 	return _pathfinding
+
+
+## Get the wild herd manager (Story 5.2).
+##
+## @return The WildHerdManager instance
+func get_wild_herd_manager() -> WildHerdManager:
+	return _wild_herd_manager
 
 
 # =============================================================================

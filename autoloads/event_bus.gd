@@ -135,6 +135,17 @@ signal territory_lost(hex_coord: Vector2i)
 ## @param hex_coord The Vector2i axial coordinates of the revealed hex
 signal fog_revealed(hex_coord: Vector2i)
 
+## Emitted when a wild herd spawns in the world.
+## @param herd_id Unique identifier for the herd
+## @param hex_coord The Vector2i axial coordinates of the herd location
+## @param animal_count Number of animals in the herd
+signal wild_herd_spawned(herd_id: String, hex_coord: Vector2i, animal_count: int)
+
+## Emitted when a wild herd is removed (defeated, despawned, etc.).
+## @param herd_id Unique identifier for the removed herd
+## @param hex_coord The Vector2i axial coordinates where herd was located
+signal wild_herd_removed(herd_id: String, hex_coord: Vector2i)
+
 ## Emitted when territory ownership changes (not just visual state).
 ## @param hex_coord The Vector2i axial coordinates of the changed hex
 ## @param old_owner The previous owner_id ("" for unowned)

@@ -35,6 +35,10 @@ var _initialized: bool = false
 ## Used for worker assignment tracking and cleanup.
 var _current_building: Node = null
 
+## Whether this animal is wild (Story 5-2).
+## Wild animals belong to enemy herds and display visual distinction.
+var is_wild: bool = false
+
 # =============================================================================
 # COMPONENTS (child nodes, assigned in _ready)
 # =============================================================================
@@ -230,6 +234,45 @@ func clear_assigned_building() -> void:
 ## @return true if animal has a building assignment
 func has_assigned_building() -> bool:
 	return is_instance_valid(_current_building)
+
+
+## Set whether this animal displays wild indicator (Story 5-2).
+## Wild animals have a subtle red tint to distinguish from player-owned animals.
+## @param enabled True to show wild indicator, false to hide it
+func set_wild_indicator(enabled: bool) -> void:
+	is_wild = enabled
+	_apply_wild_visual(enabled)
+
+
+## Check if this animal is wild (Story 5-2).
+## @return True if animal belongs to wild/enemy herd
+func is_wild_animal() -> bool:
+	return is_wild
+
+
+## Apply visual distinction for wild animals.
+## Uses subtle red tint on mesh material.
+## IMPORTANT: Creates unique material per animal to avoid shared material bugs.
+## @param enabled Whether to enable or disable the visual
+func _apply_wild_visual(enabled: bool) -> void:
+	if not _visual:
+		return
+
+	# Find MeshInstance3D children to apply tint
+	for child in _visual.get_children():
+		if child is MeshInstance3D:
+			var mesh_instance: MeshInstance3D = child
+			# Always use material_override to avoid modifying shared materials
+			var material: StandardMaterial3D = mesh_instance.material_override as StandardMaterial3D
+			if not material:
+				# Create a new material override (don't modify shared surface materials)
+				material = StandardMaterial3D.new()
+				mesh_instance.material_override = material
+
+			if enabled:
+				material.albedo_color = Color(1.0, 0.85, 0.85)  # Subtle pink/red
+			else:
+				material.albedo_color = Color.WHITE
 
 # =============================================================================
 # CLEANUP
