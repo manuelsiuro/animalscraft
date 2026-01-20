@@ -134,6 +134,14 @@ _process → timer complete → [storage full?] → YES → _paused_workers
 
 ### Testing Rules (GUT Framework)
 
+#### ⚠️ CRITICAL: Test Execution Policy
+**AI agents MUST NOT attempt to run GUT tests directly.** The user runs all tests manually in Godot.
+
+- **NEVER** try to execute `godot --headless` or any test commands
+- **ALWAYS** ask the user to run tests when verification is needed
+- **WAIT** for the user to provide test results before proceeding
+- Example: "Please run the tests in Godot and share the results."
+
 #### Test File Organization
 - Test files: `tests/unit/test_<feature_name>.gd`
 - Test functions: `test_<what_is_being_tested>()`
@@ -177,16 +185,15 @@ world_manager.set_script(script_mock)
 #### Test Coverage Requirements
 - All new functionality must have tests
 - Test acceptance criteria from stories
-- Current baseline: 1527 tests passing (verified 2026-01-19)
+- Current baseline: 1626 tests passing (verified 2026-01-20)
 
 #### Test Count Tracking Process (Epic 4 Improvement)
 **CRITICAL:** Always record actual test counts at commit time, not estimates.
 
 **Before committing story completion:**
-```bash
-cd animalscraft && godot --headless --script addons/gut/gut_cmdln.gd -gtest_ 2>&1 | tail -5
-```
-Record the actual "X passed" count in the story's Completion Notes.
+- Ask the user to run tests in Godot
+- Wait for user to provide the test results
+- Record the actual "X passed" count in the story's Completion Notes
 
 #### Test Resource Data Pattern (Epic 4 Improvement)
 **CRITICAL:** Never assume resource capacities - read actual .tres files.
@@ -336,4 +343,4 @@ Before starting implementation:
 
 ---
 
-_Last Updated: 2026-01-18_
+_Last Updated: 2026-01-20_
