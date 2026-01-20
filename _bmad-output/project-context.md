@@ -177,7 +177,29 @@ world_manager.set_script(script_mock)
 #### Test Coverage Requirements
 - All new functionality must have tests
 - Test acceptance criteria from stories
-- Current baseline: 1518+ tests passing (as of Story 4-4)
+- Current baseline: 1527 tests passing (verified 2026-01-19)
+
+#### Test Count Tracking Process (Epic 4 Improvement)
+**CRITICAL:** Always record actual test counts at commit time, not estimates.
+
+**Before committing story completion:**
+```bash
+cd animalscraft && godot --headless --script addons/gut/gut_cmdln.gd -gtest_ 2>&1 | tail -5
+```
+Record the actual "X passed" count in the story's Completion Notes.
+
+#### Test Resource Data Pattern (Epic 4 Improvement)
+**CRITICAL:** Never assume resource capacities - read actual .tres files.
+
+```gdscript
+# WRONG: Assuming capacity is 100
+assert_eq(capacity, 100)  # flour actually has max_stack_size = 500!
+
+# CORRECT: Read actual resource data
+var flour_data = load("res://resources/resources/flour_data.tres")
+var actual_capacity = flour_data.max_stack_size
+assert_eq(capacity, actual_capacity)
+```
 
 ### Code Quality & Style Rules
 

@@ -135,6 +135,12 @@ signal territory_lost(hex_coord: Vector2i)
 ## @param hex_coord The Vector2i axial coordinates of the revealed hex
 signal fog_revealed(hex_coord: Vector2i)
 
+## Emitted when territory ownership changes (not just visual state).
+## @param hex_coord The Vector2i axial coordinates of the changed hex
+## @param old_owner The previous owner_id ("" for unowned)
+## @param new_owner The new owner_id
+signal territory_ownership_changed(hex_coord: Vector2i, old_owner: String, new_owner: String)
+
 # =============================================================================
 # PROGRESSION EVENTS
 # =============================================================================

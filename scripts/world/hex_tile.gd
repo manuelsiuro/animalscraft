@@ -31,10 +31,10 @@ const FOG_OPACITY: float = 0.85
 const SCOUTED_SATURATION: float = 0.5
 const BORDER_WIDTH: float = 3.0
 
-## Territory colors
-const COLOR_CONTESTED: Color = Color("#E74C3C")  # Red
-const COLOR_CLAIMED: Color = Color("#3498DB")    # Blue (player color)
-const COLOR_NEGLECTED: Color = Color("#95A5A6")  # Gray
+## Territory colors (Story 5-1: Updated to match GDD spec)
+const COLOR_CONTESTED: Color = Color("#F44336")  # Red - enemy territory
+const COLOR_CLAIMED: Color = Color("#4CAF50")    # Green - player ownership (from GDD)
+const COLOR_NEGLECTED: Color = Color("#4CAF5080")  # Faded green (50% alpha)
 
 # =============================================================================
 # PROPERTIES
@@ -540,3 +540,4 @@ func _state_to_string(state: int) -> String:
 			return "NEGLECTED"
 		_:
 			return "UNKNOWN(%d)" % state
+
