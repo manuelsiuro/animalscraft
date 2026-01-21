@@ -29,6 +29,12 @@ var _is_potential_tap: bool = false
 ## Camera reference (for screen-to-world conversion)
 var _camera: Camera3D
 
+## Story 5-3: Reference to contested preview panel for showing on contested hex tap
+var _contested_preview_panel: ContestedPreviewPanel
+
+## Story 5-3: Reference to TerritoryManager for contested checks
+var _territory_manager: TerritoryManager
+
 # =============================================================================
 # LIFECYCLE
 # =============================================================================
@@ -36,6 +42,7 @@ var _camera: Camera3D
 func _ready() -> void:
 	# Find camera on next frame (after scene loads)
 	call_deferred("_find_camera")
+	call_deferred("_find_territory_manager")  # Story 5-3
 	GameLogger.info("Selection", "SelectionManager initialized")
 
 
@@ -57,6 +64,23 @@ func _find_camera() -> void:
 ## Code Review fix: Addresses stale camera reference issue.
 func refresh_camera() -> void:
 	_find_camera()
+
+
+## Story 5-3: Find TerritoryManager for contested hex detection.
+func _find_territory_manager() -> void:
+	var territory_managers := get_tree().get_nodes_in_group("territory_managers")
+	if territory_managers.size() > 0:
+		_territory_manager = territory_managers[0]
+
+	if _territory_manager:
+		GameLogger.debug("Selection", "TerritoryManager found")
+
+
+## Story 5-3: Set the contested preview panel reference.
+## @param panel The ContestedPreviewPanel instance
+func set_contested_preview_panel(panel: ContestedPreviewPanel) -> void:
+	_contested_preview_panel = panel
+	GameLogger.debug("Selection", "Contested preview panel set")
 
 
 ## CRITICAL: Use _input() NOT _unhandled_input() to guarantee priority over camera.
@@ -137,9 +161,15 @@ func _handle_tap(screen_pos: Vector2) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	# Story 5-3: Check for contested hex tap (AC5, AC9)
+	var hex_coord := _world_to_hex(world_pos)
+	if hex_coord and _is_contested_hex(hex_coord):
+		_show_contested_preview(hex_coord)
+		get_viewport().set_input_as_handled()
+		return
+
 	# Story 2-7: Two-tap workflow - if animal selected, try to assign destination
 	if _selected_animal and is_instance_valid(_selected_animal):
-		var hex_coord := _world_to_hex(world_pos)
 		if hex_coord and is_instance_valid(AssignmentManager):
 			var assigned := AssignmentManager.assign_to_hex(_selected_animal, hex_coord)
 			if assigned:
@@ -352,3 +382,38 @@ func has_building_selected() -> bool:
 ## Check if an animal is selected
 func has_animal_selected() -> bool:
 	return _selected_animal != null
+
+
+# =============================================================================
+# STORY 5-3: CONTESTED HEX HANDLING
+# =============================================================================
+
+## Check if a hex is contested (enemy-owned adjacent to player territory).
+## @param hex The hex coordinate to check
+## @return True if hex is contested
+func _is_contested_hex(hex: HexCoord) -> bool:
+	if not _territory_manager:
+		_find_territory_manager()
+		if not _territory_manager:
+			return false
+
+	return _territory_manager.is_contested(hex)
+
+
+## Show the contested preview panel for a hex (AC5).
+## @param hex The contested hex coordinate
+func _show_contested_preview(hex: HexCoord) -> void:
+	# Dismiss any current selection (AC9)
+	deselect_current()
+
+	if not _contested_preview_panel:
+		# Try to find the panel in the scene tree
+		var panels := get_tree().get_nodes_in_group("contested_preview_panels")
+		if panels.size() > 0:
+			_contested_preview_panel = panels[0]
+
+	if _contested_preview_panel:
+		_contested_preview_panel.show_for_hex(hex)
+		GameLogger.debug("Selection", "Showing contested preview for hex %s" % hex.to_vector())
+	else:
+		GameLogger.warn("Selection", "ContestedPreviewPanel not found - cannot show preview")

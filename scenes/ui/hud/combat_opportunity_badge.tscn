@@ -1,0 +1,67 @@
+[gd_scene load_steps=3 format=3 uid="uid://combat_opportunity_badge"]
+
+[ext_resource type="Script" path="res://scripts/ui/hud/combat_opportunity_badge.gd" id="1_combat_opportunity_badge"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_badge"]
+bg_color = Color(0.96, 0.26, 0.21, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.8, 0.2, 0.15, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
+
+[node name="CombatOpportunityBadge" type="Control"]
+custom_minimum_size = Vector2(80, 40)
+layout_mode = 3
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -90.0
+offset_top = 60.0
+offset_right = -10.0
+offset_bottom = 100.0
+grow_horizontal = 0
+script = ExtResource("1_combat_opportunity_badge")
+
+[node name="BadgeButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_badge")
+theme_override_styles/hover = SubResource("StyleBoxFlat_badge")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_badge")
+flat = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="BadgeButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="IconLabel" type="Label" parent="BadgeButton/HBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "⚔️"
+vertical_alignment = 1
+
+[node name="CountLabel" type="Label" parent="BadgeButton/HBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "3"
+vertical_alignment = 1

@@ -361,6 +361,9 @@ func _sync_territory_state_with_ownership(hex: HexCoord, owner_id: String) -> vo
 		if current_state == TerritoryState.CLAIMED or current_state == TerritoryState.CONTESTED:
 			set_territory_state(hex, TerritoryState.SCOUTED)
 
+	# Story 5-3: Update expansion glow on adjacent tiles
+	_update_expansion_glow_for_hex(hex)
+
 
 ## Decrement the player count if owner was player.
 ##
@@ -547,3 +550,73 @@ func _is_valid_hex(hex: HexCoord) -> bool:
 	# Check if tile exists at this coordinate
 	var tile := _world_manager.get_tile_at(hex)
 	return tile != null
+
+
+# =============================================================================
+# STORY 5-3: EXPANSION GLOW MANAGEMENT
+# =============================================================================
+
+## Update expansion glow for a hex and its neighbors when ownership changes (AC9).
+## Player-owned hexes adjacent to contested hexes get a subtle glow.
+##
+## @param hex The hex that changed
+func _update_expansion_glow_for_hex(hex: HexCoord) -> void:
+	if not _world_manager:
+		return
+
+	# Update this hex and all its neighbors
+	var hexes_to_update: Array[HexCoord] = [hex]
+	hexes_to_update.append_array(hex.get_neighbors())
+
+	for update_hex in hexes_to_update:
+		var tile := _world_manager.get_tile_at(update_hex) as HexTile
+		if not tile:
+			continue
+
+		# Check if tile should have expansion glow (AC9)
+		var should_glow := _should_have_expansion_glow(update_hex)
+		tile.set_expansion_glow(should_glow)
+
+
+## Check if a hex should have expansion glow (AC9).
+## A CLAIMED hex gets glow if it has any adjacent CONTESTED hexes.
+##
+## @param hex The hex to check
+## @return True if hex should have expansion glow
+func _should_have_expansion_glow(hex: HexCoord) -> bool:
+	# Only player-owned (CLAIMED) hexes can have expansion glow
+	if get_hex_owner(hex) != "player":
+		return false
+
+	# Check for adjacent contested hexes
+	var neighbors := hex.get_neighbors()
+	for neighbor in neighbors:
+		if is_contested(neighbor):
+			return true
+
+	return false
+
+
+## Get all contested hexes adjacent to player territory.
+## Used by combat opportunity badge to count available battles (AC13).
+##
+## @return Array of contested HexCoord adjacent to player territory
+func get_all_adjacent_contested() -> Array[HexCoord]:
+	var result: Array[HexCoord] = []
+	var added: Dictionary = {}  # Track already-added hexes to avoid duplicates
+
+	# For each player-owned hex, check for contested neighbors
+	for hex_vec in _ownership.keys():
+		if _ownership[hex_vec] != "player":
+			continue
+
+		var hex := HexCoord.from_vector(hex_vec)
+		var contested := get_adjacent_contested(hex)
+
+		for contested_hex in contested:
+			var contested_vec := contested_hex.to_vector()
+			if not added.has(contested_vec):
+				added[contested_vec] = true
+				result.append(contested_hex)
+
+	return result

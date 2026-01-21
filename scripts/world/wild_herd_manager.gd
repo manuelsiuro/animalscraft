@@ -521,10 +521,14 @@ func _on_fog_revealed(hex_coord: Vector2i) -> void:
 
 	# Spawn a herd at this location
 	var herd_size := 2 if not _player_start_hex else _calculate_herd_size_for_distance(hex, _player_start_hex)
-	spawn_herd(hex, herd_size)
+	var herd := spawn_herd(hex, herd_size)
 
-	if is_instance_valid(GameLogger):
-		GameLogger.info("WildHerdManager", "Spawned wild herd at newly revealed hex %s" % hex_coord)
+	if herd:
+		# Story 5-3: Emit contested territory discovered signal (AC12)
+		EventBus.contested_territory_discovered.emit(hex_coord, herd.herd_id)
+
+		if is_instance_valid(GameLogger):
+			GameLogger.info("WildHerdManager", "Spawned wild herd at newly revealed hex %s, emitting contested_territory_discovered" % hex_coord)
 
 # =============================================================================
 # ANIMAL CREATION HELPERS

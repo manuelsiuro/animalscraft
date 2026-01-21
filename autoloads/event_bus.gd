@@ -152,6 +152,16 @@ signal wild_herd_removed(herd_id: String, hex_coord: Vector2i)
 ## @param new_owner The new owner_id
 signal territory_ownership_changed(hex_coord: Vector2i, old_owner: String, new_owner: String)
 
+## Story 5-3: Emitted when player requests to start combat with a wild herd.
+## @param hex_coord The contested hex location
+## @param herd_id The wild herd to fight
+signal combat_requested(hex_coord: Vector2i, herd_id: String)
+
+## Story 5-3: Emitted when contested territory is discovered via scouting/fog reveal.
+## @param hex_coord The discovered contested hex
+## @param herd_id The wild herd at that location
+signal contested_territory_discovered(hex_coord: Vector2i, herd_id: String)
+
 # =============================================================================
 # PROGRESSION EVENTS
 # =============================================================================

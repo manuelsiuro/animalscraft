@@ -36,6 +36,17 @@ const COLOR_CONTESTED: Color = Color("#F44336")  # Red - enemy territory
 const COLOR_CLAIMED: Color = Color("#4CAF50")    # Green - player ownership (from GDD)
 const COLOR_NEGLECTED: Color = Color("#4CAF5080")  # Faded green (50% alpha)
 
+## Story 5-3: Contested pulse animation constants
+const CONTESTED_PULSE_DURATION: float = 0.8  # AC1: 0.8s cycle
+const CONTESTED_PULSE_MIN_ALPHA: float = 0.4  # Minimum border alpha during pulse
+const CONTESTED_PULSE_MAX_ALPHA: float = 1.0  # Maximum border alpha during pulse
+const CONTESTED_OVERLAY_OPACITY: float = 0.15  # AC2: 15-20% opacity red overlay
+const CONTESTED_FADE_DURATION: float = 0.4  # AC4: 0.4s transition when becoming contested
+
+## Story 5-3: Expansion glow constants
+const EXPANSION_GLOW_COLOR: Color = Color("#4CAF5040")  # Subtle green glow (25% alpha)
+const EXPANSION_GLOW_PULSE_SPEED: float = 1.5  # Slower than contested for subtlety
+
 # =============================================================================
 # PROPERTIES
 # =============================================================================
@@ -65,6 +76,18 @@ var _tween: Tween
 ## Tween for fog animation loop (AC1: subtle fog animation)
 var _fog_animation_tween: Tween
 
+## Story 5-3: Contested pulse state
+var _is_contested_pulsing: bool = false
+
+## Story 5-3: Overlay mesh for contested territory (red tint)
+var _contested_overlay: MeshInstance3D = null
+
+## Story 5-3: Global time for synchronized pulse (class-level for sync across all tiles)
+static var _global_pulse_time: float = 0.0
+
+## Story 5-3: Track if this tile should show expansion glow
+var _has_expansion_glow: bool = false
+
 # =============================================================================
 # LIFECYCLE
 # =============================================================================
@@ -74,6 +97,31 @@ func _ready() -> void:
 	add_to_group("tiles")
 	_setup_hex_mesh()
 	_setup_territory_visuals()
+	_setup_contested_overlay()  # Story 5-3
+
+
+## Story 5-3: Process for contested pulse animation (shader-free approach using static time sync)
+func _process(delta: float) -> void:
+	# Only process if this tile is pulsing
+	if not _is_contested_pulsing:
+		return
+
+	# Update global pulse time (shared across all tiles for synchronization - AC3)
+	_global_pulse_time += delta
+	# Code Review Fix: Wrap time to prevent float precision loss after extended play
+	# Wrapping at 1000s (well before precision issues at ~4.6h) maintains sync
+	if _global_pulse_time > 1000.0:
+		_global_pulse_time = fmod(_global_pulse_time, CONTESTED_PULSE_DURATION)
+
+	# Calculate synchronized pulse alpha using sine wave
+	var pulse_phase: float = sin(_global_pulse_time / CONTESTED_PULSE_DURATION * TAU)
+	var pulse_alpha: float = CONTESTED_PULSE_MIN_ALPHA + (CONTESTED_PULSE_MAX_ALPHA - CONTESTED_PULSE_MIN_ALPHA) * (pulse_phase + 1.0) / 2.0
+
+	# Apply pulse to border
+	if border_mesh:
+		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		if border_mat:
+			border_mat.albedo_color.a = pulse_alpha
 
 
 ## Initialize the hex tile with coordinate and terrain data.
@@ -242,8 +290,9 @@ func _to_string() -> String:
 ## Cleanup resources before tile destruction.
 ## AR18: Resource cleanup pattern - reverse order of creation
 func cleanup() -> void:
-	# 1. Stop all processes (none currently)
+	# 1. Stop all processes
 	set_process(false)
+	_is_contested_pulsing = false  # Story 5-3
 
 	# 2. Disconnect all signals (none currently)
 	# Future: Disconnect any connected signals here
@@ -258,6 +307,7 @@ func cleanup() -> void:
 	mesh_instance = null
 	border_mesh = null
 	fog_mesh = null
+	_contested_overlay = null  # Story 5-3
 
 	# 5. Remove from groups
 	if is_in_group("tiles"):
@@ -386,95 +436,130 @@ func _animate_state_transition() -> void:
 
 ## Apply UNEXPLORED visual state: dark fog overlay, no border.
 func _apply_unexplored_state(tween: Tween) -> void:
+	# Story 5-3: Stop contested effects if transitioning from contested
+	stop_contested_pulse()
+	set_contested_overlay(false, true)
+
 	# Dark fog overlay
-	fog_mesh.visible = true
-	var fog_mat := fog_mesh.get_surface_override_material(0) as StandardMaterial3D
-	if fog_mat:
-		tween.tween_property(fog_mat, "albedo_color:a", FOG_OPACITY, STATE_TRANSITION_DURATION)
+	if fog_mesh:
+		fog_mesh.visible = true
+		var fog_mat := fog_mesh.get_surface_override_material(0) as StandardMaterial3D
+		if fog_mat:
+			tween.tween_property(fog_mat, "albedo_color:a", FOG_OPACITY, STATE_TRANSITION_DURATION)
+		# AC1: Start subtle fog animation (pulsing opacity)
+		tween.tween_callback(_start_fog_animation).set_delay(STATE_TRANSITION_DURATION)
 
 	# No border
-	var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
-	if border_mat:
-		tween.tween_property(border_mat, "albedo_color:a", 0.0, STATE_TRANSITION_DURATION)
-
-	# AC1: Start subtle fog animation (pulsing opacity)
-	tween.tween_callback(_start_fog_animation).set_delay(STATE_TRANSITION_DURATION)
+	if border_mesh:
+		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		if border_mat:
+			tween.tween_property(border_mat, "albedo_color:a", 0.0, STATE_TRANSITION_DURATION)
 
 ## Apply SCOUTED visual state: fade out fog, desaturate terrain, no border.
 func _apply_scouted_state(tween: Tween) -> void:
 	# Stop fog animation if running
 	_stop_fog_animation()
 
+	# Story 5-3: Stop contested effects if transitioning from contested
+	stop_contested_pulse()
+	set_contested_overlay(false, true)
+
 	# Fade out fog
-	var fog_mat := fog_mesh.get_surface_override_material(0) as StandardMaterial3D
-	if fog_mat:
-		tween.tween_property(fog_mat, "albedo_color:a", 0.0, STATE_TRANSITION_DURATION)
-	tween.tween_callback(func(): fog_mesh.visible = false).set_delay(STATE_TRANSITION_DURATION)
+	if fog_mesh:
+		var fog_mat := fog_mesh.get_surface_override_material(0) as StandardMaterial3D
+		if fog_mat:
+			tween.tween_property(fog_mat, "albedo_color:a", 0.0, STATE_TRANSITION_DURATION)
+		tween.tween_callback(func(): if fog_mesh: fog_mesh.visible = false).set_delay(STATE_TRANSITION_DURATION)
 
 	# Desaturate terrain
 	var desaturated_color := _desaturate_color(_get_terrain_color(terrain_type), SCOUTED_SATURATION)
-	var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
-	if mesh_mat:
-		tween.tween_property(mesh_mat, "albedo_color", desaturated_color, STATE_TRANSITION_DURATION)
+	if mesh_instance:
+		var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+		if mesh_mat:
+			tween.tween_property(mesh_mat, "albedo_color", desaturated_color, STATE_TRANSITION_DURATION)
 
 	# No border
-	var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
-	if border_mat:
-		tween.tween_property(border_mat, "albedo_color:a", 0.0, STATE_TRANSITION_DURATION)
+	if border_mesh:
+		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		if border_mat:
+			tween.tween_property(border_mat, "albedo_color:a", 0.0, STATE_TRANSITION_DURATION)
 
-## Apply CONTESTED visual state: full saturation, red border.
+## Apply CONTESTED visual state: full saturation, red pulsing border, red overlay.
+## Story 5-3: Enhanced with pulsing border (AC1) and overlay (AC2).
 func _apply_contested_state(tween: Tween) -> void:
 	# Stop fog animation if running
 	_stop_fog_animation()
 
 	# Remove fog
-	fog_mesh.visible = false
+	if fog_mesh:
+		fog_mesh.visible = false
 
 	# Full saturation terrain
 	var full_color := _get_terrain_color(terrain_type)
-	var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
-	if mesh_mat:
-		tween.tween_property(mesh_mat, "albedo_color", full_color, STATE_TRANSITION_DURATION)
+	if mesh_instance:
+		var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+		if mesh_mat:
+			tween.tween_property(mesh_mat, "albedo_color", full_color, STATE_TRANSITION_DURATION)
 
-	# Red border
-	var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
-	if border_mat:
-		tween.tween_property(border_mat, "albedo_color", COLOR_CONTESTED, STATE_TRANSITION_DURATION)
+	# Red border (initial color, pulse will animate alpha)
+	if border_mesh:
+		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		if border_mat:
+			tween.tween_property(border_mat, "albedo_color", COLOR_CONTESTED, STATE_TRANSITION_DURATION)
+
+	# Story 5-3: Start pulse animation after transition (AC4: 0.4s fade-in transition)
+	tween.tween_callback(start_contested_pulse).set_delay(STATE_TRANSITION_DURATION)
+
+	# Story 5-3: Show contested overlay with fade (AC2, AC4)
+	set_contested_overlay(true, true)
 
 ## Apply CLAIMED visual state: full saturation, player color border.
 func _apply_claimed_state(tween: Tween) -> void:
 	# Stop fog animation if running
 	_stop_fog_animation()
 
+	# Story 5-3: Stop contested effects if transitioning from contested
+	stop_contested_pulse()
+	set_contested_overlay(false, true)
+
 	# Remove fog
-	fog_mesh.visible = false
+	if fog_mesh:
+		fog_mesh.visible = false
 
 	# Full saturation terrain
 	var full_color := _get_terrain_color(terrain_type)
-	var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
-	if mesh_mat:
-		tween.tween_property(mesh_mat, "albedo_color", full_color, STATE_TRANSITION_DURATION)
+	if mesh_instance:
+		var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+		if mesh_mat:
+			tween.tween_property(mesh_mat, "albedo_color", full_color, STATE_TRANSITION_DURATION)
 
 	# Player color border
-	var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
-	if border_mat:
-		tween.tween_property(border_mat, "albedo_color", COLOR_CLAIMED, STATE_TRANSITION_DURATION)
+	if border_mesh:
+		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		if border_mat:
+			tween.tween_property(border_mat, "albedo_color", COLOR_CLAIMED, STATE_TRANSITION_DURATION)
 
 ## Apply NEGLECTED visual state: full saturation, gray border.
 func _apply_neglected_state(tween: Tween) -> void:
 	# Stop fog animation if running
 	_stop_fog_animation()
 
+	# Story 5-3: Stop contested effects if transitioning from contested
+	stop_contested_pulse()
+	set_contested_overlay(false, true)
+
 	# Terrain stays full saturation
 	var full_color := _get_terrain_color(terrain_type)
-	var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
-	if mesh_mat:
-		tween.tween_property(mesh_mat, "albedo_color", full_color, STATE_TRANSITION_DURATION)
+	if mesh_instance:
+		var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+		if mesh_mat:
+			tween.tween_property(mesh_mat, "albedo_color", full_color, STATE_TRANSITION_DURATION)
 
 	# Border fades to gray
-	var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
-	if border_mat:
-		tween.tween_property(border_mat, "albedo_color", COLOR_NEGLECTED, STATE_TRANSITION_DURATION)
+	if border_mesh:
+		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		if border_mat:
+			tween.tween_property(border_mat, "albedo_color", COLOR_NEGLECTED, STATE_TRANSITION_DURATION)
 
 ## Desaturate a color by reducing saturation in HSV space.
 ##
@@ -541,3 +626,121 @@ func _state_to_string(state: int) -> String:
 		_:
 			return "UNKNOWN(%d)" % state
 
+
+# =============================================================================
+# STORY 5-3: CONTESTED TERRITORY DISPLAY
+# =============================================================================
+
+## Setup the contested overlay mesh for red tint effect (AC2).
+## Creates a separate mesh layer above terrain for the contested overlay.
+func _setup_contested_overlay() -> void:
+	# Create overlay mesh instance
+	_contested_overlay = MeshInstance3D.new()
+	_contested_overlay.name = "ContestedOverlay"
+	add_child(_contested_overlay)
+
+	# Create hex mesh same size as terrain
+	_contested_overlay.mesh = _create_hexagonal_mesh(GameConstants.HEX_SIZE)
+	_contested_overlay.position.y = 0.015  # Between terrain and border
+
+	# Create red overlay material
+	var overlay_mat := StandardMaterial3D.new()
+	overlay_mat.albedo_color = Color(1.0, 0.0, 0.0, 0.0)  # Red, initially transparent
+	overlay_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	overlay_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED  # Flat color
+	_contested_overlay.set_surface_override_material(0, overlay_mat)
+	_contested_overlay.visible = false
+
+
+## Start the contested pulse animation (AC1, AC3).
+## Uses class-level time sync for synchronized pulsing across all contested hexes.
+func start_contested_pulse() -> void:
+	if _is_contested_pulsing:
+		return  # Already pulsing
+
+	_is_contested_pulsing = true
+	set_process(true)  # Enable _process for pulse animation
+
+	if is_instance_valid(GameLogger):
+		GameLogger.debug("HexTile", "Started contested pulse at %s" % (hex_coord.to_vector() if hex_coord else Vector2i.ZERO))
+
+
+## Stop the contested pulse animation (AC1).
+## Resets border to static contested color.
+func stop_contested_pulse() -> void:
+	if not _is_contested_pulsing:
+		return
+
+	_is_contested_pulsing = false
+
+	# Only disable _process if not needed for other animations
+	# Currently no other _process animations, so safe to disable
+	set_process(false)
+
+	# Reset border to static contested color
+	if border_mesh:
+		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		if border_mat:
+			border_mat.albedo_color = COLOR_CONTESTED
+
+	if is_instance_valid(GameLogger):
+		GameLogger.debug("HexTile", "Stopped contested pulse at %s" % (hex_coord.to_vector() if hex_coord else Vector2i.ZERO))
+
+
+## Set the contested overlay visibility with optional fade transition (AC2, AC4).
+## @param enabled True to show overlay, false to hide
+## @param animate True to use fade transition (AC4), false for immediate
+func set_contested_overlay(enabled: bool, animate: bool = true) -> void:
+	if not _contested_overlay:
+		return
+
+	var overlay_mat := _contested_overlay.get_surface_override_material(0) as StandardMaterial3D
+	if not overlay_mat:
+		return
+
+	var target_alpha: float = CONTESTED_OVERLAY_OPACITY if enabled else 0.0
+
+	if enabled:
+		_contested_overlay.visible = true
+
+	if animate:
+		# Use tween for smooth transition (AC4: 0.4s fade)
+		var overlay_tween := create_tween()
+		overlay_tween.tween_property(overlay_mat, "albedo_color:a", target_alpha, CONTESTED_FADE_DURATION)
+		if not enabled:
+			overlay_tween.tween_callback(func(): _contested_overlay.visible = false)
+	else:
+		# Immediate change
+		overlay_mat.albedo_color.a = target_alpha
+		if not enabled:
+			_contested_overlay.visible = false
+
+
+## Set expansion glow effect for player territory adjacent to contested (AC9).
+## @param enabled True to show glow, false to hide
+func set_expansion_glow(enabled: bool) -> void:
+	_has_expansion_glow = enabled
+
+	# Apply subtle green glow to border
+	if border_mesh:
+		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		if border_mat:
+			if enabled and territory_state == 3:  # CLAIMED
+				# Add subtle glow by increasing emission
+				border_mat.emission_enabled = true
+				border_mat.emission = COLOR_CLAIMED
+				border_mat.emission_energy_multiplier = 0.3  # Subtle glow
+			else:
+				border_mat.emission_enabled = false
+
+
+## Check if this tile is currently showing contested pulse.
+## @return True if pulse animation is active
+func is_contested_pulsing() -> bool:
+	return _is_contested_pulsing
+
+
+## Check if this tile has expansion glow enabled.
+## @return True if expansion glow is active
+func has_expansion_glow() -> bool:
+	return _has_expansion_glow
