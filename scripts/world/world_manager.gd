@@ -40,6 +40,9 @@ var _pathfinding: PathfindingManager
 ## Wild herd manager (Story 5.2 - for wild animal herds)
 var _wild_herd_manager: WildHerdManager
 
+## Combat manager (Story 5.5 - for auto-battle system)
+var _combat_manager: CombatManager
+
 # =============================================================================
 # SIGNALS
 # =============================================================================
@@ -91,6 +94,12 @@ func _ready() -> void:
 	add_child(_wild_herd_manager)
 	_wild_herd_manager.initialize(self)
 	# Note: spawn_initial_herds() will be called later when player start is determined
+
+	# Create and initialize combat manager (Story 5.5)
+	_combat_manager = CombatManager.new()
+	_combat_manager.name = "CombatManager"
+	add_child(_combat_manager)
+	_combat_manager.initialize(self)
 
 
 # =============================================================================
@@ -263,6 +272,13 @@ func get_pathfinding_manager() -> PathfindingManager:
 ## @return The WildHerdManager instance
 func get_wild_herd_manager() -> WildHerdManager:
 	return _wild_herd_manager
+
+
+## Get the combat manager (Story 5.5).
+##
+## @return The CombatManager instance
+func get_combat_manager() -> CombatManager:
+	return _combat_manager
 
 
 # =============================================================================

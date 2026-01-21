@@ -206,6 +206,14 @@ signal animal_captured(animal_type: String)
 ## @note Consumers should cast: `var animal := team[i] as Animal`
 signal combat_team_selected(team: Array, hex_coord: Vector2i, herd_id: String)
 
+## Story 5-5: Emitted during combat when an attack occurs.
+## Used by animation/UI systems (Story 5-6) to display attack visuals.
+## @param attacker The CombatUnit performing the attack (has .animal property)
+## @param defender The CombatUnit being attacked (has .animal property)
+## @param damage The damage dealt
+## @param defender_hp The defender's HP after damage
+signal combat_attack_occurred(attacker: RefCounted, defender: RefCounted, damage: int, defender_hp: int)
+
 # =============================================================================
 # GAME STATE EVENTS
 # =============================================================================
