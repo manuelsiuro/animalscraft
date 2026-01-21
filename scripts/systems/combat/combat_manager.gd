@@ -113,6 +113,10 @@ const MIN_DAMAGE: int = 1
 const TURN_DELAY_MIN: float = 0.8
 const TURN_DELAY_MAX: float = 1.2
 
+## AIComponent.AnimalState.RESTING value (must match ai_component.gd enum)
+## Used when marking animals as tired after defeat
+const AI_STATE_RESTING: int = 3
+
 # =============================================================================
 # PROPERTIES
 # =============================================================================
@@ -535,8 +539,7 @@ func _mark_animal_tired(animal: Node) -> void:
 	# Find AIComponent and transition to RESTING
 	var ai_component := animal.get_node_or_null("AIComponent")
 	if ai_component and ai_component.has_method("transition_to"):
-		# AIComponent.AnimalState.RESTING = 3
-		ai_component.transition_to(3)  # RESTING state
+		ai_component.transition_to(AI_STATE_RESTING)
 		GameLogger.debug("CombatManager", "Marked %s as tired (RESTING)" % (
 			animal.get_animal_id() if animal.has_method("get_animal_id") else "unknown"
 		))
