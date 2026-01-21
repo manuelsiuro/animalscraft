@@ -199,6 +199,13 @@ signal combat_ended(won: bool, captured_animals: Array)
 ## @param animal_type The type of animal captured
 signal animal_captured(animal_type: String)
 
+## Story 5-4: Emitted when player confirms combat team selection.
+## @param team Array of Animal nodes selected for combat (untyped Array, cast elements to Animal)
+## @param hex_coord The contested hex location
+## @param herd_id The wild herd to fight
+## @note Consumers should cast: `var animal := team[i] as Animal`
+signal combat_team_selected(team: Array, hex_coord: Vector2i, herd_id: String)
+
 # =============================================================================
 # GAME STATE EVENTS
 # =============================================================================

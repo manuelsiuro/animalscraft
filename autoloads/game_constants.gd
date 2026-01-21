@@ -183,3 +183,25 @@ const TAP_MAX_DISTANCE_PX: float = 10.0
 ## Default tap radius for selectable entities (pixels)
 ## Used to determine if a tap hits an entity
 const SELECTION_TAP_RADIUS: float = 32.0
+
+# =============================================================================
+# UI UTILITY FUNCTIONS
+# =============================================================================
+
+## Get emoji icon for animal type (used in combat UI and other displays).
+## @param animal_type The animal type string (e.g., "rabbit", "fox")
+## @return The emoji icon for the animal type, or default paw icon
+static func get_animal_icon(animal_type: String) -> String:
+	match animal_type:
+		"rabbit":
+			return "🐰"
+		"fox":
+			return "🦊"
+		"deer":
+			return "🦌"
+		"bear":
+			return "🐻"
+		"wolf":
+			return "🐺"
+		_:
+			return "🐾"
