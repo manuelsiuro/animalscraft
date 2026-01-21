@@ -1,0 +1,126 @@
+[gd_scene load_steps=5 format=3 uid="uid://combat_overlay"]
+
+[ext_resource type="Script" path="res://scripts/ui/gameplay/combat_overlay.gd" id="1_overlay_script"]
+[ext_resource type="Script" path="res://scripts/ui/gameplay/combat_animation_manager.gd" id="2_animation_manager"]
+[ext_resource type="PackedScene" uid="uid://battle_result_panel" path="res://scenes/ui/gameplay/battle_result_panel.tscn" id="3_battle_result_panel"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_arena"]
+bg_color = Color(0.1, 0.1, 0.15, 0.95)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.96, 0.76, 0.26, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+content_margin_left = 20.0
+content_margin_top = 16.0
+content_margin_right = 20.0
+content_margin_bottom = 16.0
+
+[node name="CombatOverlay" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_overlay_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.7)
+
+[node name="ArenaPanel" type="PanelContainer" parent="."]
+custom_minimum_size = Vector2(500, 400)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -200.0
+offset_right = 250.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_arena")
+
+[node name="MarginContainer" type="MarginContainer" parent="ArenaPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="HBoxContainer" type="HBoxContainer" parent="ArenaPanel/MarginContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+
+[node name="PlayerTeamContainer" type="VBoxContainer" parent="ArenaPanel/MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="TeamLabel" type="Label" parent="ArenaPanel/MarginContainer/HBoxContainer/PlayerTeamContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.69, 0.31, 1)
+theme_override_font_sizes/font_size = 16
+text = "🏠 Your Team"
+horizontal_alignment = 1
+
+[node name="VSLabel" type="Label" parent="ArenaPanel/MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 1
+theme_override_colors/font_color = Color(0.96, 0.76, 0.26, 1)
+theme_override_font_sizes/font_size = 36
+text = "⚔️"
+vertical_alignment = 1
+
+[node name="EnemyTeamContainer" type="VBoxContainer" parent="ArenaPanel/MarginContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="TeamLabel" type="Label" parent="ArenaPanel/MarginContainer/HBoxContainer/EnemyTeamContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.26, 0.21, 1)
+theme_override_font_sizes/font_size = 16
+text = "🐾 Wild Herd"
+horizontal_alignment = 1
+
+[node name="BattleStatusLabel" type="Label" parent="ArenaPanel"]
+layout_mode = 2
+offset_left = 150.0
+offset_top = 360.0
+offset_right = 350.0
+offset_bottom = 385.0
+theme_override_colors/font_color = Color(0.96, 0.76, 0.26, 1)
+theme_override_font_sizes/font_size = 18
+text = "⚔️ Battle in Progress!"
+horizontal_alignment = 1
+
+[node name="CombatAnimationManager" type="Node" parent="."]
+script = ExtResource("2_animation_manager")
+
+[node name="EffectsContainer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="BattleResultPanel" parent="." instance=ExtResource("3_battle_result_panel")]
+visible = false
+layout_mode = 1

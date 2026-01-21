@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://splat_effect"]
+
+[ext_resource type="Script" path="res://scripts/effects/splat_effect.gd" id="1_splat_effect_script"]
+
+[node name="SplatEffect" type="Node2D"]
+script = ExtResource("1_splat_effect_script")

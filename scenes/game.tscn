@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://resource_bar_hud" path="res://scenes/ui/hud/resource_bar_hud.tscn" id="9_resource_bar_hud"]
 [ext_resource type="PackedScene" uid="uid://contested_preview_panel" path="res://scenes/ui/gameplay/contested_preview_panel.tscn" id="10_contested_preview_panel"]
 [ext_resource type="PackedScene" uid="uid://combat_team_selection_modal" path="res://scenes/ui/gameplay/combat_team_selection_modal.tscn" id="11_combat_team_selection_modal"]
+[ext_resource type="PackedScene" uid="uid://combat_overlay" path="res://scenes/ui/gameplay/combat_overlay.tscn" id="12_combat_overlay"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -42,6 +43,8 @@ script = ExtResource("2_lnu2h")
 [node name="ContestedPreviewPanel" parent="UI" instance=ExtResource("10_contested_preview_panel")]
 
 [node name="CombatTeamSelectionModal" parent="UI" instance=ExtResource("11_combat_team_selection_modal")]
+
+[node name="CombatOverlay" parent="UI" instance=ExtResource("12_combat_overlay")]
 
 [node name="Camera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 50, 30)

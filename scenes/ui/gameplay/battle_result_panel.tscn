@@ -1,0 +1,109 @@
+[gd_scene load_steps=3 format=3 uid="uid://battle_result_panel"]
+
+[ext_resource type="Script" path="res://scripts/ui/gameplay/battle_result_panel.gd" id="1_result_panel_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.12, 0.1, 0.15, 0.95)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.96, 0.76, 0.26, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+content_margin_left = 24.0
+content_margin_top = 20.0
+content_margin_right = 24.0
+content_margin_bottom = 20.0
+
+[node name="BattleResultPanel" type="PanelContainer"]
+custom_minimum_size = Vector2(320, 280)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -140.0
+offset_right = 160.0
+offset_bottom = 140.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+script = ExtResource("1_result_panel_script")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.84, 0, 1)
+theme_override_font_sizes/font_size = 24
+text = "🎉 VICTORY! 🎉"
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.75, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+text = "You conquered the territory!"
+horizontal_alignment = 1
+
+[node name="CelebrationIcons" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 8
+
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="StatsContainer" type="VBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TurnsLabel" type="Label" parent="MarginContainer/VBoxContainer/StatsContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.75, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+text = "⏱️ Turns: 5"
+
+[node name="DamageLabel" type="Label" parent="MarginContainer/VBoxContainer/StatsContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.75, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+text = "💥 Total Damage: 45"
+
+[node name="CapturedLabel" type="Label" parent="MarginContainer/VBoxContainer/StatsContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.69, 0.31, 1)
+theme_override_font_sizes/font_size = 14
+text = "Captured: 🐰 🦊"
+
+[node name="HSeparator2" type="HSeparator" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ContinueButton" type="Button" parent="MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "Continue"
+
+[node name="ConfettiContainer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
