@@ -199,6 +199,17 @@ signal combat_ended(won: bool, captured_animals: Array)
 ## @param animal_type The type of animal captured
 signal animal_captured(animal_type: String)
 
+## Story 5-8: Emitted when a wild animal is recruited to the player's village.
+## Fired per animal during the recruitment process, after animal_spawned completes.
+## @param animal_type The type of animal recruited (e.g., "rabbit")
+## @param animal The Animal node that was recruited
+signal animal_recruited(animal_type: String, animal: Node)
+
+## Story 5-8: Emitted when a batch recruitment operation completes.
+## Fired once after all selected animals have been recruited.
+## @param recruited_count The total number of animals recruited in this batch
+signal recruitment_completed(recruited_count: int)
+
 ## Story 5-4: Emitted when player confirms combat team selection.
 ## @param team Array of Animal nodes selected for combat (untyped Array, cast elements to Animal)
 ## @param hex_coord The contested hex location

@@ -5,8 +5,11 @@
 ## Story 5-7: Enhanced to show captured animals with icons, names, and
 ## "Available for recruitment" label.
 ##
+## Story 5-8: Enhanced with recruitment selection UI. Players can now select
+## which captured animals to recruit to their village.
+##
 ## Architecture: scripts/ui/gameplay/battle_result_panel.gd
-## Story: 5-6-display-combat-animations, 5-7-implement-victory-outcomes
+## Story: 5-6-display-combat-animations, 5-7-implement-victory-outcomes, 5-8-implement-animal-capture
 class_name BattleResultPanel
 extends PanelContainer
 
@@ -17,6 +20,10 @@ extends PanelContainer
 ## Emitted when player taps Continue button (AC13)
 signal result_acknowledged()
 
+## Story 5-8: Emitted when recruitment is confirmed with selected animal types
+## @param selected_animals Array of animal type strings to recruit
+signal recruitment_confirmed(selected_animals: Array)
+
 # =============================================================================
 # CONSTANTS
 # =============================================================================
@@ -26,11 +33,14 @@ const VICTORY_BOUNCE_DURATION: float = 0.3
 const DEFEAT_DROOP_DURATION: float = 0.5
 const CONFETTI_DURATION: float = 2.0
 const FADE_IN_DURATION: float = 0.3
+const RECRUITING_DURATION: float = 1.5
 
 ## Colors
 const VICTORY_COLOR: Color = Color("#4CAF50")  # Green
 const DEFEAT_COLOR: Color = Color("#9E9E9E")  # Gray
 const GOLD_COLOR: Color = Color("#FFD700")  # Gold for victory
+const CHECKBOX_SELECTED_COLOR: Color = Color("#4CAF50")  # Green check
+const CHECKBOX_DESELECTED_COLOR: Color = Color("#AAAAAA")  # Gray
 
 ## Confetti settings
 const CONFETTI_PARTICLE_COUNT: int = 20
@@ -53,6 +63,14 @@ const CONFETTI_PARTICLE_COUNT: int = 20
 ## Created programmatically if not present in scene
 var _captured_animals_container: VBoxContainer = null
 
+## Story 5-8: Recruitment UI components (created programmatically)
+var _recruitment_section: VBoxContainer = null
+var _recruitment_items: Array = []  # Array of HBoxContainer with CheckBox
+var _select_all_button: Button = null
+var _deselect_all_button: Button = null
+var _selection_counter_label: Label = null
+var _recruiting_label: Label = null
+
 # =============================================================================
 # STATE
 # =============================================================================
@@ -65,12 +83,26 @@ var _turns_taken: int = 0
 var _total_damage_dealt: int = 0
 var _captured_animals: Array = []
 
+## Story 5-8: Recruitment state
+var _is_recruiting: bool = false
+var _has_capturable_animals: bool = false
+
 ## Animation tween
 var _tween: Tween = null
 
 # =============================================================================
 # LIFECYCLE
 # =============================================================================
+
+## Ensure we have a valid continue button reference.
+## Needed because @onready may fail if UI structure is added after _ready().
+func _ensure_continue_button() -> void:
+	if _continue_button and is_instance_valid(_continue_button):
+		return
+	_continue_button = get_node_or_null("MarginContainer/VBoxContainer/ContinueButton")
+	if _continue_button and not _continue_button.pressed.is_connected(_on_continue_pressed):
+		_continue_button.pressed.connect(_on_continue_pressed)
+
 
 func _ready() -> void:
 	# Start hidden
@@ -91,11 +123,14 @@ func _exit_tree() -> void:
 # =============================================================================
 
 ## Show victory celebration with captured animals (Story 5-7: AC10, AC11, AC12, AC18).
+## Story 5-8: Now includes recruitment selection UI for captured animals.
 ## @param captured_animals Array of animal type strings that were captured
 ## @param battle_log Array of BattleLogEntry for stats calculation
 func show_victory(captured_animals: Array, battle_log: Array = []) -> void:
 	_is_victory = true
-	_captured_animals = captured_animals
+	_captured_animals = captured_animals if captured_animals else []
+	_is_recruiting = false
+	_has_capturable_animals = not _captured_animals.is_empty()
 	_calculate_stats(battle_log)
 
 	# Configure display
@@ -109,8 +144,20 @@ func show_victory(captured_animals: Array, battle_log: Array = []) -> void:
 
 	_update_stats_display()
 
-	# Story 5-7: Enhanced captured animals display (AC10, AC11, AC12, AC18)
-	_display_captured_animals(captured_animals)
+	# Ensure button reference is valid (may have been added after _ready)
+	_ensure_continue_button()
+
+	# Story 5-8: Show recruitment UI if there are captured animals (AC1, AC12)
+	if _has_capturable_animals:
+		_display_recruitment_ui(_captured_animals)
+		# Change button text (AC13)
+		if _continue_button:
+			_continue_button.text = "Confirm & Continue"
+	else:
+		# Story 5-7: Show simple captured display for empty case (AC16)
+		_display_captured_animals(_captured_animals)
+		if _continue_button:
+			_continue_button.text = "Continue"
 
 	# Show with animation
 	_show_with_animation()
@@ -124,6 +171,8 @@ func show_victory(captured_animals: Array, battle_log: Array = []) -> void:
 func show_defeat(battle_log: Array = []) -> void:
 	_is_victory = false
 	_captured_animals = []
+	_has_capturable_animals = false
+	_is_recruiting = false
 	_calculate_stats(battle_log)
 
 	# Configure display
@@ -141,6 +190,16 @@ func show_defeat(battle_log: Array = []) -> void:
 	if _captured_label:
 		_captured_label.visible = false
 
+	# Hide recruitment UI
+	_hide_recruitment_ui()
+
+	# Ensure button reference is valid
+	_ensure_continue_button()
+
+	# Reset button text
+	if _continue_button:
+		_continue_button.text = "Continue"
+
 	# Show with animation
 	_show_with_animation()
 
@@ -156,6 +215,22 @@ func get_battle_stats() -> Dictionary:
 		"captured_count": _captured_animals.size(),
 		"is_victory": _is_victory
 	}
+
+
+## Story 5-8: Get selected animals for recruitment.
+## @return Array of animal type strings that are selected
+func get_selected_animals() -> Array:
+	var selected: Array = []
+
+	for i in _recruitment_items.size():
+		var item: HBoxContainer = _recruitment_items[i]
+		var checkbox: CheckBox = item.get_node_or_null("CheckBox")
+		if checkbox and checkbox.button_pressed:
+			# Get animal type from stored metadata
+			if i < _captured_animals.size():
+				selected.append(_captured_animals[i])
+
+	return selected
 
 # =============================================================================
 # PRIVATE METHODS - DISPLAY
@@ -187,7 +262,212 @@ func _update_stats_display() -> void:
 
 
 # =============================================================================
+# RECRUITMENT UI (Story 5-8: AC1-4, AC12, AC13, AC16, AC17)
+# =============================================================================
+
+## Display recruitment selection UI for captured animals.
+## Replaces the simple captured animals display with interactive checkboxes.
+## @param captured_animals Array of animal type strings
+func _display_recruitment_ui(captured_animals: Array) -> void:
+	# Update header label (AC1)
+	if _captured_label:
+		_captured_label.visible = true
+		_captured_label.text = "🎁 Recruit Animals"
+
+	# Create or get the recruitment section container
+	_ensure_recruitment_section()
+
+	# Clear any existing items
+	_recruitment_items.clear()
+	if _recruitment_section and is_instance_valid(_recruitment_section):
+		for child in _recruitment_section.get_children():
+			child.queue_free()
+
+	# Wait a frame for cleanup
+	await get_tree().process_frame
+
+	# Create recruitment item for each captured animal (AC2)
+	for i in captured_animals.size():
+		var animal_type: String = captured_animals[i]
+		var item := _create_recruitment_item(animal_type, i)
+		_recruitment_section.add_child(item)
+		_recruitment_items.append(item)
+
+	# Add selection controls (AC3, AC4)
+	_create_selection_controls()
+
+	# Update counter
+	_update_selection_counter()
+
+
+## Ensure the recruitment section container exists.
+func _ensure_recruitment_section() -> void:
+	if _recruitment_section and is_instance_valid(_recruitment_section):
+		return
+
+	# Look for existing container in stats container
+	if _stats_container:
+		_recruitment_section = _stats_container.get_node_or_null("RecruitmentSection")
+
+	# Create if not found
+	if not _recruitment_section:
+		_recruitment_section = VBoxContainer.new()
+		_recruitment_section.name = "RecruitmentSection"
+		_recruitment_section.add_theme_constant_override("separation", 6)
+
+		# Insert after _captured_label if it exists
+		if _stats_container and _captured_label:
+			var label_index := _captured_label.get_index()
+			_stats_container.add_child(_recruitment_section)
+			_stats_container.move_child(_recruitment_section, label_index + 1)
+		elif _stats_container:
+			_stats_container.add_child(_recruitment_section)
+
+
+## Create a recruitment item with checkbox for a single animal (AC2).
+## @param animal_type The animal type string
+## @param index The index in the captured animals array
+## @return HBoxContainer with checkbox, icon, and name
+func _create_recruitment_item(animal_type: String, index: int) -> HBoxContainer:
+	var container := HBoxContainer.new()
+	container.name = "RecruitmentItem_%d" % index
+	container.add_theme_constant_override("separation", 8)
+	container.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	# Checkbox - default to selected (AC3)
+	var checkbox := CheckBox.new()
+	checkbox.name = "CheckBox"
+	checkbox.button_pressed = true  # All selected by default
+	checkbox.toggled.connect(_on_recruitment_checkbox_toggled)
+	container.add_child(checkbox)
+
+	# Animal icon
+	var icon_label := Label.new()
+	icon_label.name = "Icon"
+	icon_label.text = GameConstants.get_animal_icon(animal_type)
+	icon_label.add_theme_font_size_override("font_size", 24)
+	container.add_child(icon_label)
+
+	# Animal name
+	var name_label := Label.new()
+	name_label.name = "Name"
+	name_label.text = GameConstants.get_animal_display_name(animal_type)
+	name_label.add_theme_font_size_override("font_size", 14)
+	name_label.add_theme_color_override("font_color", GOLD_COLOR)
+	container.add_child(name_label)
+
+	return container
+
+
+## Create Select All / Deselect All buttons and counter (AC3, AC4).
+func _create_selection_controls() -> void:
+	if not _recruitment_section:
+		return
+
+	# Container for buttons
+	var controls_container := HBoxContainer.new()
+	controls_container.name = "SelectionControls"
+	controls_container.add_theme_constant_override("separation", 10)
+	controls_container.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	# Select All button
+	_select_all_button = Button.new()
+	_select_all_button.name = "SelectAllButton"
+	_select_all_button.text = "Select All"
+	_select_all_button.pressed.connect(_on_select_all_pressed)
+	controls_container.add_child(_select_all_button)
+
+	# Deselect All button
+	_deselect_all_button = Button.new()
+	_deselect_all_button.name = "DeselectAllButton"
+	_deselect_all_button.text = "Deselect All"
+	_deselect_all_button.pressed.connect(_on_deselect_all_pressed)
+	controls_container.add_child(_deselect_all_button)
+
+	_recruitment_section.add_child(controls_container)
+
+	# Selection counter (AC3.6)
+	_selection_counter_label = Label.new()
+	_selection_counter_label.name = "SelectionCounter"
+	_selection_counter_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_selection_counter_label.add_theme_font_size_override("font_size", 12)
+	_recruitment_section.add_child(_selection_counter_label)
+
+
+## Update selection counter display.
+func _update_selection_counter() -> void:
+	if not _selection_counter_label:
+		return
+
+	var selected := get_selected_animals()
+	var total := _captured_animals.size()
+	var releasing := total - selected.size()
+
+	_selection_counter_label.text = "Recruiting: %d | Releasing: %d" % [selected.size(), releasing]
+
+
+## Hide recruitment UI.
+func _hide_recruitment_ui() -> void:
+	if _recruitment_section and is_instance_valid(_recruitment_section):
+		_recruitment_section.visible = false
+
+
+## Show "Recruiting..." loading state (AC14).
+func _show_recruiting_state() -> void:
+	_is_recruiting = true
+
+	# Hide selection UI
+	if _recruitment_section:
+		for child in _recruitment_section.get_children():
+			if child.name != "RecruitingLabel":
+				child.visible = false
+
+	# Show recruiting message
+	if not _recruiting_label:
+		_recruiting_label = Label.new()
+		_recruiting_label.name = "RecruitingLabel"
+		_recruiting_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_recruiting_label.add_theme_font_size_override("font_size", 16)
+		if _recruitment_section:
+			_recruitment_section.add_child(_recruiting_label)
+
+	if _recruiting_label:
+		_recruiting_label.text = "🐾 Recruiting..."
+		_recruiting_label.visible = true
+
+	# Disable continue button during recruitment
+	if _continue_button:
+		_continue_button.disabled = true
+
+	# Spawn more confetti for celebration
+	if _confetti_container:
+		_spawn_confetti()
+
+
+## Show recruitment success messages (AC4.5).
+## @param recruited_animals Array of animal type strings that were recruited
+func _show_recruitment_success(recruited_animals: Array) -> void:
+	if recruited_animals.is_empty():
+		# AC17: All deselected case
+		if _recruiting_label:
+			_recruiting_label.text = "🌿 Animals released back to the wild"
+			_recruiting_label.visible = true
+	else:
+		# Show success for each animal
+		var messages: Array = []
+		for animal_type in recruited_animals:
+			var display_name := GameConstants.get_animal_display_name(animal_type)
+			var icon := GameConstants.get_animal_icon(animal_type)
+			messages.append("%s %s joined your village!" % [icon, display_name])
+
+		if _recruiting_label:
+			_recruiting_label.text = "\n".join(messages)
+			_recruiting_label.visible = true
+
+
+# =============================================================================
 # CAPTURED ANIMALS DISPLAY (Story 5-7: AC10, AC11, AC12, AC18)
+# Kept for defeat screen and empty captures case
 # =============================================================================
 
 ## Display captured animals section with icons, names, and recruitment label.
@@ -199,7 +479,7 @@ func _display_captured_animals(captured_animals: Array) -> void:
 		_captured_label.visible = true
 
 		if captured_animals.is_empty():
-			# AC18: Handle empty captured_animals array gracefully
+			# AC18/AC16: Handle empty captured_animals array gracefully
 			_captured_label.text = "🐾 No animals captured"
 		else:
 			# AC11: Label as "available for recruitment"
@@ -435,8 +715,32 @@ func _animate_defeat_droop() -> void:
 # SIGNAL HANDLERS
 # =============================================================================
 
-## Handle Continue button press (AC13).
+## Handle Continue button press (AC13, Story 5-8: AC4).
 func _on_continue_pressed() -> void:
+	# Story 5-8: If we have capturable animals, process recruitment first
+	if _has_capturable_animals and not _is_recruiting:
+		var selected := get_selected_animals()
+
+		# Show recruiting state
+		_show_recruiting_state()
+
+		# Emit recruitment confirmed signal
+		recruitment_confirmed.emit(selected)
+
+		# Show success message after a brief delay
+		await get_tree().create_timer(RECRUITING_DURATION).timeout
+
+		# Show success message
+		_show_recruitment_success(selected)
+
+		# Wait for player to read message
+		await get_tree().create_timer(1.0).timeout
+
+		# Re-enable continue and proceed to close
+		if _continue_button:
+			_continue_button.disabled = false
+
+	# Emit result acknowledged and close panel
 	result_acknowledged.emit()
 
 	# Hide panel
@@ -447,4 +751,30 @@ func _on_continue_pressed() -> void:
 	_tween.tween_property(self, "modulate:a", 0.0, FADE_IN_DURATION)
 	_tween.tween_callback(func():
 		visible = false
+		# Reset state for next use
+		_is_recruiting = false
+		_has_capturable_animals = false
 	)
+
+
+## Handle recruitment checkbox toggle (AC3).
+func _on_recruitment_checkbox_toggled(_pressed: bool) -> void:
+	_update_selection_counter()
+
+
+## Handle Select All button press (AC3.4).
+func _on_select_all_pressed() -> void:
+	for item in _recruitment_items:
+		var checkbox: CheckBox = item.get_node_or_null("CheckBox")
+		if checkbox:
+			checkbox.button_pressed = true
+	_update_selection_counter()
+
+
+## Handle Deselect All button press (AC3.4).
+func _on_deselect_all_pressed() -> void:
+	for item in _recruitment_items:
+		var checkbox: CheckBox = item.get_node_or_null("CheckBox")
+		if checkbox:
+			checkbox.button_pressed = false
+	_update_selection_counter()

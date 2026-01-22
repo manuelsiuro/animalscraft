@@ -281,6 +281,26 @@ func get_combat_manager() -> CombatManager:
 	return _combat_manager
 
 
+## Get the player's spawn hex for recruited animals (Story 5-8).
+## Returns home hex (0,0) or fallback (1,0) if home hex is blocked.
+## Simplified implementation - no search algorithm needed per story requirements.
+##
+## @return HexCoord for spawning player animals
+func get_player_spawn_hex() -> HexCoord:
+	# Home hex (0,0) is the player's starting location
+	var home_hex := HexCoord.new(0, 0)
+	var home_tile := get_tile_at(home_hex)
+
+	# Check if home hex exists and is valid for spawning
+	if home_tile and home_tile.terrain_type == HexTile.TerrainType.GRASS:
+		return home_hex
+
+	# Fallback to (1,0) if home is blocked
+	if is_instance_valid(GameLogger):
+		GameLogger.warn("WorldManager", "Home hex (0,0) blocked, using fallback (1,0)")
+	return HexCoord.new(1, 0)
+
+
 # =============================================================================
 # COORDINATE UTILITIES
 # =============================================================================

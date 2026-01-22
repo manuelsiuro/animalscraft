@@ -2,8 +2,12 @@
 ## Shows both teams, handles attack animations, victory/defeat celebrations.
 ## Integrates with CombatManager via EventBus signals.
 ##
+## Story 5-8: Enhanced to support animal recruitment flow. When player wins with
+## captured animals, the BattleResultPanel shows recruitment UI and this overlay
+## processes the recruitment via RecruitmentManager.
+##
 ## Architecture: scripts/ui/gameplay/combat_overlay.gd
-## Story: 5-6-display-combat-animations
+## Story: 5-6-display-combat-animations, 5-8-implement-animal-capture
 ##
 ## Usage:
 ##   # Automatically shown via EventBus signal
@@ -117,6 +121,8 @@ func _ready() -> void:
 	if _battle_result_panel:
 		_battle_result_panel.visible = false
 		_battle_result_panel.result_acknowledged.connect(_on_result_acknowledged)
+		# Story 5-8: Connect recruitment confirmed signal
+		_battle_result_panel.recruitment_confirmed.connect(_on_recruitment_confirmed)
 
 	GameLogger.info("UI", "CombatOverlay initialized")
 
@@ -465,3 +471,63 @@ func _set_camera_controls_enabled(enabled: bool) -> void:
 func _on_result_acknowledged() -> void:
 	GameLogger.debug("UI", "CombatOverlay: Result acknowledged, closing overlay")
 	close_overlay()
+
+
+# =============================================================================
+# RECRUITMENT HANDLING (Story 5-8)
+# =============================================================================
+
+## Handle recruitment confirmed signal from BattleResultPanel.
+## Creates new player animals at spawn hex using RecruitmentManager.
+## @param selected_animals Array of animal type strings to recruit
+func _on_recruitment_confirmed(selected_animals: Array) -> void:
+	GameLogger.info("UI", "CombatOverlay: Recruitment confirmed, %d animals selected" % selected_animals.size())
+
+	if selected_animals.is_empty():
+		# No animals selected - all released back to wild (AC17)
+		GameLogger.info("UI", "CombatOverlay: No animals recruited, all released to wild")
+		return
+
+	# Get WorldManager as scene parent for recruited animals
+	var scene_parent := _get_world_manager()
+	if not scene_parent:
+		GameLogger.error("UI", "CombatOverlay: Cannot recruit - WorldManager not found")
+		return
+
+	# Get spawn hex from WorldManager
+	var spawn_hex: HexCoord = null
+	if scene_parent.has_method("get_player_spawn_hex"):
+		spawn_hex = scene_parent.get_player_spawn_hex()
+	else:
+		# Fallback to home hex (0,0)
+		spawn_hex = HexCoord.new(0, 0)
+
+	# Call RecruitmentManager to process recruitment
+	var recruited := RecruitmentManager.recruit_animals(selected_animals, spawn_hex, scene_parent)
+
+	GameLogger.info("UI", "CombatOverlay: Recruited %d animals to village at %s" % [
+		recruited.size(), spawn_hex
+	])
+
+
+## Get WorldManager from scene tree.
+func _get_world_manager() -> Node:
+	# Try via Game scene
+	var games := get_tree().get_nodes_in_group("game")
+	if not games.is_empty():
+		var game = games[0]
+		if game.has_method("get_world"):
+			return game.get_world()
+		if "world" in game:
+			return game.world
+
+	# Try direct lookup
+	var managers := get_tree().get_nodes_in_group("world_managers")
+	if not managers.is_empty():
+		return managers[0]
+
+	# Try from combat manager
+	if _combat_manager and "_world_manager" in _combat_manager:
+		return _combat_manager._world_manager
+
+	return null
