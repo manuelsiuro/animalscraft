@@ -483,6 +483,7 @@ func _check_all_knocked_out(team: Array[CombatUnit]) -> bool:
 # =============================================================================
 
 ## Process player victory (AC15, AC17, AC18).
+## Story 5-7: Also scouts adjacent hexes after claiming territory.
 func _process_victory() -> void:
 	GameLogger.info("CombatManager", "VICTORY! Player wins at %s" % _current_hex)
 
@@ -499,6 +500,15 @@ func _process_victory() -> void:
 		territory_manager.set_hex_owner(hex, "player", "combat")
 		GameLogger.info("CombatManager", "Territory claimed at %s via combat" % _current_hex)
 
+		# Story 5-7: Scout adjacent hexes after claiming (AC7-9, AC16-17)
+		# Get TerritoryManager directly from WorldManager for proper typing
+		if _world_manager and _world_manager.has_method("get_territory_manager"):
+			var tm = _world_manager.get_territory_manager()
+			if tm and tm.has_method("get_territory_state"):
+				_scout_adjacent_hexes_untyped(_current_hex, tm)
+			else:
+				GameLogger.warn("CombatManager", "TerritoryManager does not have required methods, skipping adjacent hex scouting")
+
 	# Remove wild herd (AC18)
 	var wild_herd_manager := _get_wild_herd_manager()
 	if wild_herd_manager:
@@ -510,6 +520,39 @@ func _process_victory() -> void:
 
 	# Reset state
 	_reset_combat_state()
+
+
+# =============================================================================
+# ADJACENT HEX SCOUTING (Story 5-7: AC7, AC8, AC9, AC16, AC17)
+# =============================================================================
+
+## Scout all UNEXPLORED hexes adjacent to a newly claimed hex.
+## Hexes that are already SCOUTED, CLAIMED, or CONTESTED are skipped.
+## Updates are batched to prevent visual flicker (AC9).
+##
+## @param claimed_hex_vec The Vector2i of the newly claimed hex
+## @param territory_mgr The TerritoryManager reference (validated by caller in _process_victory)
+func _scout_adjacent_hexes_untyped(claimed_hex_vec: Vector2i, territory_mgr) -> void:
+	var claimed_hex := HexCoord.from_vector(claimed_hex_vec)
+	var neighbors := claimed_hex.get_neighbors()
+	var scouted_count := 0
+
+	# Batch scout all unexplored neighbors (AC9)
+	for neighbor in neighbors:
+		# Check territory state using TerritoryManager
+		var current_state: int = territory_mgr.get_territory_state(neighbor)
+
+		# Only scout UNEXPLORED hexes (AC16, AC17)
+		# Skip hexes that are already SCOUTED, CLAIMED, or CONTESTED
+		if current_state == TerritoryManager.TerritoryState.UNEXPLORED:
+			territory_mgr.scout_territory(neighbor)
+			scouted_count += 1
+			GameLogger.debug("CombatManager", "Scouted adjacent hex %s" % neighbor.to_vector())
+
+	if scouted_count > 0:
+		GameLogger.info("CombatManager", "Scouted %d adjacent hexes after victory" % scouted_count)
+	else:
+		GameLogger.debug("CombatManager", "No unexplored adjacent hexes to scout")
 
 # =============================================================================
 # DEFEAT PROCESSING (AC16, AC19, AC20)
@@ -567,7 +610,13 @@ func _log_action(attacker: CombatUnit, defender: CombatUnit, damage: int) -> voi
 ## Get TerritoryManager from WorldManager.
 func _get_territory_manager() -> Node:
 	if _world_manager and _world_manager.has_method("get_territory_manager"):
-		return _world_manager.get_territory_manager()
+		var tm = _world_manager.get_territory_manager()
+		GameLogger.debug("CombatManager", "Got TerritoryManager: %s, class: %s, has get_territory_state: %s" % [
+			tm,
+			tm.get_class() if tm else "null",
+			tm.has_method("get_territory_state") if tm else false
+		])
+		return tm
 	if _world_manager and "_territory_manager" in _world_manager:
 		return _world_manager._territory_manager
 	return null

@@ -2,8 +2,11 @@
 ## Shows confetti for victory, drooping for defeat, battle stats, and Continue button.
 ## Emits signal when player acknowledges result.
 ##
+## Story 5-7: Enhanced to show captured animals with icons, names, and
+## "Available for recruitment" label.
+##
 ## Architecture: scripts/ui/gameplay/battle_result_panel.gd
-## Story: 5-6-display-combat-animations
+## Story: 5-6-display-combat-animations, 5-7-implement-victory-outcomes
 class_name BattleResultPanel
 extends PanelContainer
 
@@ -46,6 +49,10 @@ const CONFETTI_PARTICLE_COUNT: int = 20
 @onready var _confetti_container: Control = $ConfettiContainer
 @onready var _celebration_icons: HBoxContainer = $MarginContainer/VBoxContainer/CelebrationIcons
 
+## Story 5-7: Container for dynamically created captured animal displays
+## Created programmatically if not present in scene
+var _captured_animals_container: VBoxContainer = null
+
 # =============================================================================
 # STATE
 # =============================================================================
@@ -83,7 +90,7 @@ func _exit_tree() -> void:
 # PUBLIC API
 # =============================================================================
 
-## Show victory celebration with captured animals (AC10, AC12).
+## Show victory celebration with captured animals (Story 5-7: AC10, AC11, AC12, AC18).
 ## @param captured_animals Array of animal type strings that were captured
 ## @param battle_log Array of BattleLogEntry for stats calculation
 func show_victory(captured_animals: Array, battle_log: Array = []) -> void:
@@ -102,16 +109,8 @@ func show_victory(captured_animals: Array, battle_log: Array = []) -> void:
 
 	_update_stats_display()
 
-	# Show captured animals section only if some were captured
-	if _captured_label:
-		if captured_animals.is_empty():
-			_captured_label.visible = false
-		else:
-			_captured_label.visible = true
-			var capture_text := "Captured: "
-			for animal_type in captured_animals:
-				capture_text += GameConstants.get_animal_icon(animal_type) + " "
-			_captured_label.text = capture_text
+	# Story 5-7: Enhanced captured animals display (AC10, AC11, AC12, AC18)
+	_display_captured_animals(captured_animals)
 
 	# Show with animation
 	_show_with_animation()
@@ -185,6 +184,90 @@ func _update_stats_display() -> void:
 
 	if _damage_label:
 		_damage_label.text = "💥 Total Damage: %d" % _total_damage_dealt
+
+
+# =============================================================================
+# CAPTURED ANIMALS DISPLAY (Story 5-7: AC10, AC11, AC12, AC18)
+# =============================================================================
+
+## Display captured animals section with icons, names, and recruitment label.
+## Handles empty array gracefully with "No animals captured" message (AC18).
+## @param captured_animals Array of animal type strings
+func _display_captured_animals(captured_animals: Array) -> void:
+	# Use existing _captured_label for the section header
+	if _captured_label:
+		_captured_label.visible = true
+
+		if captured_animals.is_empty():
+			# AC18: Handle empty captured_animals array gracefully
+			_captured_label.text = "🐾 No animals captured"
+		else:
+			# AC11: Label as "available for recruitment"
+			_captured_label.text = "🎁 Captured Animals - Available for recruitment!"
+
+	# Create or get the captured animals display container
+	_ensure_captured_animals_container()
+
+	# Clear any existing displays (with null safety - AR18)
+	if _captured_animals_container and is_instance_valid(_captured_animals_container):
+		for child in _captured_animals_container.get_children():
+			child.queue_free()
+
+		# AC10, AC11: Show each captured animal type with icon and name
+		if not captured_animals.is_empty():
+			for animal_type in captured_animals:
+				var animal_display := _create_captured_animal_display(animal_type)
+				_captured_animals_container.add_child(animal_display)
+
+
+## Ensure the captured animals container exists.
+## Creates it programmatically if not in the scene tree.
+func _ensure_captured_animals_container() -> void:
+	if _captured_animals_container and is_instance_valid(_captured_animals_container):
+		return
+
+	# Look for existing container in stats container
+	if _stats_container:
+		_captured_animals_container = _stats_container.get_node_or_null("CapturedAnimalsContainer")
+
+	# Create if not found
+	if not _captured_animals_container:
+		_captured_animals_container = VBoxContainer.new()
+		_captured_animals_container.name = "CapturedAnimalsContainer"
+		_captured_animals_container.add_theme_constant_override("separation", 4)
+
+		# Insert after _captured_label if it exists
+		if _stats_container and _captured_label:
+			var label_index := _captured_label.get_index()
+			_stats_container.add_child(_captured_animals_container)
+			_stats_container.move_child(_captured_animals_container, label_index + 1)
+		elif _stats_container:
+			_stats_container.add_child(_captured_animals_container)
+
+
+## Create a display for a single captured animal type.
+## Shows icon, name, and maintains cozy aesthetic.
+## @param animal_type The animal type string (e.g., "rabbit")
+## @return HBoxContainer with the animal display
+func _create_captured_animal_display(animal_type: String) -> HBoxContainer:
+	var container := HBoxContainer.new()
+	container.add_theme_constant_override("separation", 8)
+	container.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	# Animal icon (AC11)
+	var icon_label := Label.new()
+	icon_label.text = GameConstants.get_animal_icon(animal_type)
+	icon_label.add_theme_font_size_override("font_size", 24)
+	container.add_child(icon_label)
+
+	# Animal name (AC11)
+	var name_label := Label.new()
+	name_label.text = GameConstants.get_animal_display_name(animal_type)
+	name_label.add_theme_font_size_override("font_size", 14)
+	name_label.add_theme_color_override("font_color", GOLD_COLOR)
+	container.add_child(name_label)
+
+	return container
 
 
 ## Show panel with fade animation.

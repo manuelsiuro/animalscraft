@@ -205,3 +205,26 @@ static func get_animal_icon(animal_type: String) -> String:
 			return "🐺"
 		_:
 			return "🐾"
+
+
+## Get display name for animal type (used in UI displays).
+## Story 5-7: Added for captured animal display in victory panel.
+## @param animal_type The animal type string (e.g., "rabbit", "fox")
+## @return The display name for the animal type (Title Case)
+static func get_animal_display_name(animal_type: String) -> String:
+	match animal_type:
+		"rabbit":
+			return "Rabbit"
+		"fox":
+			return "Fox"
+		"deer":
+			return "Deer"
+		"bear":
+			return "Bear"
+		"wolf":
+			return "Wolf"
+		_:
+			# Capitalize first letter as fallback
+			if animal_type.is_empty():
+				return "Unknown"
+			return animal_type.capitalize()
