@@ -210,6 +210,17 @@ signal animal_recruited(animal_type: String, animal: Node)
 ## @param recruited_count The total number of animals recruited in this batch
 signal recruitment_completed(recruited_count: int)
 
+## Story 5-9: Emitted when an animal is marked as tired after combat defeat.
+## Fired per animal during defeat processing, after state transition to RESTING.
+## @param animal The Animal node that was marked tired
+signal animal_tired(animal: Node)
+
+## Story 5-9: Emitted when player animals begin retreating after combat defeat.
+## Fired once at the start of retreat processing, before animals are teleported home.
+## @param hex_coord The contested hex location where defeat occurred
+## @param animal_count Number of animals retreating
+signal combat_retreat_started(hex_coord: Vector2i, animal_count: int)
+
 ## Story 5-4: Emitted when player confirms combat team selection.
 ## @param team Array of Animal nodes selected for combat (untyped Array, cast elements to Animal)
 ## @param hex_coord The contested hex location

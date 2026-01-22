@@ -167,6 +167,7 @@ func show_victory(captured_animals: Array, battle_log: Array = []) -> void:
 
 
 ## Show defeat animation (AC11, AC12).
+## Story 5-9: Enhanced with friendly retreat messaging and "Return to Village" button.
 ## @param battle_log Array of BattleLogEntry for stats calculation
 func show_defeat(battle_log: Array = []) -> void:
 	_is_victory = false
@@ -175,13 +176,14 @@ func show_defeat(battle_log: Array = []) -> void:
 	_is_recruiting = false
 	_calculate_stats(battle_log)
 
-	# Configure display
+	# Configure display (Story 5-9 AC7)
 	if _title_label:
 		_title_label.text = "😔 Defeated..."
 		_title_label.add_theme_color_override("font_color", DEFEAT_COLOR)
 
+	# Story 5-9 AC8, AC14: Friendly, cozy messaging - no harsh "failure" language
 	if _subtitle_label:
-		_subtitle_label.text = "Your animals need rest."
+		_subtitle_label.text = "Your animals retreated to rest. Try again when they've recovered!"
 		_subtitle_label.visible = true
 
 	_update_stats_display()
@@ -196,9 +198,9 @@ func show_defeat(battle_log: Array = []) -> void:
 	# Ensure button reference is valid
 	_ensure_continue_button()
 
-	# Reset button text
+	# Story 5-9 AC9: Change button text to "Return to Village" for defeat
 	if _continue_button:
-		_continue_button.text = "Continue"
+		_continue_button.text = "Return to Village"
 
 	# Show with animation
 	_show_with_animation()

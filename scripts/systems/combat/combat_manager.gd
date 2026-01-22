@@ -117,6 +117,9 @@ const TURN_DELAY_MAX: float = 1.2
 ## Used when marking animals as tired after defeat
 const AI_STATE_RESTING: int = 3
 
+## Home hex constant - player's village center for retreat destination (Story 5-9)
+const HOME_HEX := Vector2i(0, 0)
+
 # =============================================================================
 # PROPERTIES
 # =============================================================================
@@ -559,33 +562,81 @@ func _scout_adjacent_hexes_untyped(claimed_hex_vec: Vector2i, territory_mgr) -> 
 # =============================================================================
 
 ## Process player defeat (AC16, AC19, AC20).
+## Story 5-9: Enhanced with retreat signals, energy depletion, and teleport home.
 func _process_defeat() -> void:
 	GameLogger.info("CombatManager", "DEFEAT! Player loses at %s" % _current_hex)
 
-	# Mark player animals as tired (AC19)
+	# Story 5-9 AC6: Emit retreat started signal before processing (NEW SIGNAL)
+	var retreat_count := _player_team.size()
+	EventBus.combat_retreat_started.emit(_current_hex, retreat_count)
+
+	# Mark player animals as tired and teleport home (AC19, Story 5-9 AC1-3)
 	for unit in _player_team:
 		if unit.animal and is_instance_valid(unit.animal):
 			_mark_animal_tired(unit.animal)
+			_teleport_animal_home(unit.animal)
 
-	# Hex and herd remain unchanged (AC20)
-	# No territory claim, no herd removal
+	# Hex and herd remain unchanged (AC20, Story 5-9 AC11-12)
+	# No territory claim, no herd removal - wild herd stays on hex
 
-	# Emit combat ended signal (AC16)
+	# Emit combat ended signal (AC16, Story 5-9 AC4)
 	EventBus.combat_ended.emit(false, [])
 
 	# Reset state
 	_reset_combat_state()
 
 
-## Mark an animal as tired, transitioning to RESTING state (AC19).
+## Mark an animal as tired, setting energy = 0 and transitioning to RESTING state.
+## Story 5-9 AC1, AC5: Sets energy to 0 AND transitions to RESTING state.
+## Emits animal_tired signal after state transition.
 func _mark_animal_tired(animal: Node) -> void:
+	var animal_id: String = animal.get_animal_id() if animal.has_method("get_animal_id") else "unknown"
+
+	# Story 5-9 AC1: Set energy = 0 via StatsComponent
+	var stats_component := animal.get_node_or_null("StatsComponent")
+	if stats_component:
+		# Deplete all remaining energy to set to 0
+		var current_energy: int = stats_component.get_energy() if stats_component.has_method("get_energy") else 0
+		if current_energy > 0 and stats_component.has_method("deplete_energy"):
+			stats_component.deplete_energy(current_energy)
+		GameLogger.debug("CombatManager", "%s energy depleted to 0" % animal_id)
+
 	# Find AIComponent and transition to RESTING
 	var ai_component := animal.get_node_or_null("AIComponent")
 	if ai_component and ai_component.has_method("transition_to"):
 		ai_component.transition_to(AI_STATE_RESTING)
-		GameLogger.debug("CombatManager", "Marked %s as tired (RESTING)" % (
-			animal.get_animal_id() if animal.has_method("get_animal_id") else "unknown"
-		))
+		GameLogger.debug("CombatManager", "Marked %s as tired (RESTING)" % animal_id)
+
+	# Story 5-9 AC5: Emit animal_tired signal AFTER state transition
+	# Use call_deferred for proper signal ordering (Story 5-8 learning)
+	EventBus.animal_tired.emit.call_deferred(animal)
+
+
+## Teleport animal to home hex (0,0) for retreat after defeat.
+## Story 5-9 AC2: Animals are teleported to home hex after defeat.
+## Uses MVP Option A: instant teleport (Option B pathfind walk deferred to future).
+func _teleport_animal_home(animal: Node) -> void:
+	if not is_instance_valid(animal):
+		return
+
+	# Only Node3D and descendants have global_position
+	if not animal is Node3D:
+		GameLogger.debug("CombatManager", "Skipping teleport for non-Node3D animal")
+		return
+
+	# Get home hex world position using HexGrid
+	var home_hex := HexCoord.new(HOME_HEX.x, HOME_HEX.y)
+	var home_world_pos: Vector3 = HexGrid.hex_to_world(home_hex)
+
+	# Add small random offset to prevent stacking (± 0.5 units)
+	home_world_pos.x += randf_range(-0.5, 0.5)
+	home_world_pos.z += randf_range(-0.5, 0.5)
+
+	# Teleport animal to home position
+	(animal as Node3D).global_position = home_world_pos
+
+	var animal_id: String = animal.get_animal_id() if animal.has_method("get_animal_id") else "unknown"
+	GameLogger.debug("CombatManager", "Teleported %s to home hex %s" % [animal_id, HOME_HEX])
 
 # =============================================================================
 # BATTLE LOG (AC24, AC25)

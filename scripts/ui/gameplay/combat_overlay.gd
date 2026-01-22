@@ -98,6 +98,12 @@ var _active_tweens: Array[Tween] = []
 ## Fade tween
 var _fade_tween: Tween = null
 
+## Story 5-9: Track if last battle was a victory (for camera pan on close)
+var _last_was_victory: bool = true
+
+## Story 5-9: Home hex constant for defeat camera pan
+const HOME_HEX := Vector2i(0, 0)
+
 # =============================================================================
 # LIFECYCLE
 # =============================================================================
@@ -207,8 +213,12 @@ func _on_combat_started(hex_coord: Vector2i) -> void:
 
 
 ## Handle combat_ended signal (AC10, AC11, AC12, AC13).
+## Story 5-9: Track victory state for camera pan on defeat.
 func _on_combat_ended(won: bool, captured_animals: Array) -> void:
 	GameLogger.info("UI", "CombatOverlay: Combat ended, won=%s, captured=%d" % [won, captured_animals.size()])
+
+	# Story 5-9: Track victory state for camera pan decision in close_overlay
+	_last_was_victory = won
 
 	# Update status label
 	if _battle_status_label:
@@ -468,9 +478,46 @@ func _set_camera_controls_enabled(enabled: bool) -> void:
 
 
 ## Handle result panel Continue button (AC13).
+## Story 5-9 AC10: Pan camera to home hex on defeat acknowledgment.
 func _on_result_acknowledged() -> void:
 	GameLogger.debug("UI", "CombatOverlay: Result acknowledged, closing overlay")
+
+	# Story 5-9 AC10: If defeat, pan camera to home hex (0,0)
+	if not _last_was_victory:
+		_pan_camera_to_home_hex()
+
 	close_overlay()
+
+
+## Pan camera to home hex (0,0) for defeat flow.
+## Story 5-9 AC10: Smoothly focus camera on village after defeat.
+func _pan_camera_to_home_hex() -> void:
+	# Get home world position
+	var home_hex := HexCoord.new(HOME_HEX.x, HOME_HEX.y)
+	var home_world_pos: Vector3 = HexGrid.hex_to_world(home_hex)
+
+	# Find camera controller and focus on home position
+	var cameras := get_tree().get_nodes_in_group("camera_controllers")
+	if not cameras.is_empty():
+		var controller := cameras[0]
+		# Try focus_on_position method (preferred)
+		if controller.has_method("focus_on_position"):
+			controller.focus_on_position(home_world_pos)
+			GameLogger.debug("UI", "CombatOverlay: Camera panning to home hex %s" % HOME_HEX)
+			return
+		# Fallback: Try set_target_position
+		if controller.has_method("set_target_position"):
+			controller.set_target_position(home_world_pos)
+			GameLogger.debug("UI", "CombatOverlay: Camera target set to home hex %s" % HOME_HEX)
+			return
+
+	# Final fallback: Direct camera position set
+	var camera := get_viewport().get_camera_3d()
+	if camera:
+		# Set camera X/Z to home position, keep current Y (zoom level)
+		camera.global_position.x = home_world_pos.x
+		camera.global_position.z = home_world_pos.z
+		GameLogger.debug("UI", "CombatOverlay: Camera directly moved to home hex %s" % HOME_HEX)
 
 
 # =============================================================================
