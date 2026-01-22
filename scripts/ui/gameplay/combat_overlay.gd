@@ -518,6 +518,10 @@ func _pan_camera_to_home_hex() -> void:
 		camera.global_position.x = home_world_pos.x
 		camera.global_position.z = home_world_pos.z
 		GameLogger.debug("UI", "CombatOverlay: Camera directly moved to home hex %s" % HOME_HEX)
+		return
+
+	# All fallbacks failed - log warning
+	GameLogger.warn("UI", "CombatOverlay: Could not pan camera to home hex - no camera controller or camera found")
 
 
 # =============================================================================

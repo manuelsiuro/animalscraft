@@ -411,8 +411,12 @@ func test_retreat_signal_emitted_before_combat_ended() -> void:
 
 	var signal_order: Array = []
 
-	EventBus.combat_retreat_started.connect(func(_hex, _count): signal_order.append("retreat"))
-	EventBus.combat_ended.connect(func(_won, _captured): signal_order.append("ended"))
+	# Store lambdas as variables so we can disconnect ONLY these specific connections
+	var retreat_callback := func(_hex, _count): signal_order.append("retreat")
+	var ended_callback := func(_won, _captured): signal_order.append("ended")
+
+	EventBus.combat_retreat_started.connect(retreat_callback)
+	EventBus.combat_ended.connect(ended_callback)
 
 	_combat_manager.start_combat(player_team, Vector2i(1, 1), "test_herd")
 
@@ -426,9 +430,8 @@ func test_retreat_signal_emitted_before_combat_ended() -> void:
 		var ended_index: int = signal_order.find("ended")
 		assert_lt(retreat_index, ended_index, "retreat signal should come before ended signal")
 
-	# Cleanup connections
-	for connection in EventBus.combat_retreat_started.get_connections():
-		EventBus.combat_retreat_started.disconnect(connection.callable)
-	for connection in EventBus.combat_ended.get_connections():
-		if connection.callable.get_method() != "_on_combat_ended":  # Don't disconnect internal handlers
-			EventBus.combat_ended.disconnect(connection.callable)
+	# Cleanup ONLY our specific connections (not all connections)
+	if EventBus.combat_retreat_started.is_connected(retreat_callback):
+		EventBus.combat_retreat_started.disconnect(retreat_callback)
+	if EventBus.combat_ended.is_connected(ended_callback):
+		EventBus.combat_ended.disconnect(ended_callback)

@@ -120,6 +120,9 @@ const AI_STATE_RESTING: int = 3
 ## Home hex constant - player's village center for retreat destination (Story 5-9)
 const HOME_HEX := Vector2i(0, 0)
 
+## Random offset range for teleport positioning (prevents animal stacking)
+const TELEPORT_RANDOM_OFFSET: float = 0.5
+
 # =============================================================================
 # PROPERTIES
 # =============================================================================
@@ -628,9 +631,9 @@ func _teleport_animal_home(animal: Node) -> void:
 	var home_hex := HexCoord.new(HOME_HEX.x, HOME_HEX.y)
 	var home_world_pos: Vector3 = HexGrid.hex_to_world(home_hex)
 
-	# Add small random offset to prevent stacking (± 0.5 units)
-	home_world_pos.x += randf_range(-0.5, 0.5)
-	home_world_pos.z += randf_range(-0.5, 0.5)
+	# Add small random offset to prevent stacking
+	home_world_pos.x += randf_range(-TELEPORT_RANDOM_OFFSET, TELEPORT_RANDOM_OFFSET)
+	home_world_pos.z += randf_range(-TELEPORT_RANDOM_OFFSET, TELEPORT_RANDOM_OFFSET)
 
 	# Teleport animal to home position
 	(animal as Node3D).global_position = home_world_pos
