@@ -1,0 +1,234 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/menus/settings_screen.gd" id="1_settings_screen"]
+
+[node name="SettingsScreen" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_settings_screen")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.12, 0.15, 0.2, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="Header" type="HBoxContainer" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="BackButton" type="Button" parent="VBoxContainer/Header"]
+custom_minimum_size = Vector2(80, 60)
+layout_mode = 2
+size_flags_vertical = 4
+text = "< Back"
+
+[node name="Title" type="Label" parent="VBoxContainer/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+theme_override_font_sizes/font_size = 32
+text = "Settings"
+vertical_alignment = 1
+
+[node name="Spacer" type="Control" parent="VBoxContainer/Header"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="SettingsContainer" type="VBoxContainer" parent="VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="AudioSection" type="VBoxContainer" parent="VBoxContainer/ScrollContainer/SettingsContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="AudioHeader" type="Label" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Audio"
+
+[node name="Separator1" type="HSeparator" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection"]
+layout_mode = 2
+
+[node name="MusicVolume" type="HBoxContainer" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="Label" type="Label" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection/MusicVolume"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+text = "Music Volume"
+
+[node name="HSlider" type="HSlider" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection/MusicVolume"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+min_value = 0.0
+max_value = 100.0
+value = 80.0
+
+[node name="ValueLabel" type="Label" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection/MusicVolume"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "80%"
+horizontal_alignment = 2
+
+[node name="SfxVolume" type="HBoxContainer" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="Label" type="Label" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection/SfxVolume"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+text = "SFX Volume"
+
+[node name="HSlider" type="HSlider" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection/SfxVolume"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+min_value = 0.0
+max_value = 100.0
+value = 100.0
+
+[node name="ValueLabel" type="Label" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection/SfxVolume"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "100%"
+horizontal_alignment = 2
+
+[node name="MuteToggle" type="CheckButton" parent="VBoxContainer/ScrollContainer/SettingsContainer/AudioSection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+text = "Mute All Audio"
+
+[node name="GameplaySection" type="VBoxContainer" parent="VBoxContainer/ScrollContainer/SettingsContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="GameplayHeader" type="Label" parent="VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Gameplay"
+
+[node name="Separator2" type="HSeparator" parent="VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection"]
+layout_mode = 2
+
+[node name="AutoSaveToggle" type="CheckButton" parent="VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+button_pressed = true
+text = "Auto-Save"
+
+[node name="VibrationToggle" type="CheckButton" parent="VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+button_pressed = true
+text = "Vibration Feedback"
+
+[node name="TouchSensitivity" type="HBoxContainer" parent="VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="Label" type="Label" parent="VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection/TouchSensitivity"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+text = "Touch Sensitivity"
+
+[node name="HSlider" type="HSlider" parent="VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection/TouchSensitivity"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+min_value = 25.0
+max_value = 400.0
+value = 100.0
+
+[node name="ValueLabel" type="Label" parent="VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection/TouchSensitivity"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "100%"
+horizontal_alignment = 2
+
+[node name="AccessibilitySection" type="VBoxContainer" parent="VBoxContainer/ScrollContainer/SettingsContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="AccessibilityHeader" type="Label" parent="VBoxContainer/ScrollContainer/SettingsContainer/AccessibilitySection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Accessibility"
+
+[node name="Separator3" type="HSeparator" parent="VBoxContainer/ScrollContainer/SettingsContainer/AccessibilitySection"]
+layout_mode = 2
+
+[node name="ColorblindMode" type="HBoxContainer" parent="VBoxContainer/ScrollContainer/SettingsContainer/AccessibilitySection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="Label" type="Label" parent="VBoxContainer/ScrollContainer/SettingsContainer/AccessibilitySection/ColorblindMode"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+text = "Colorblind Mode"
+
+[node name="OptionButton" type="OptionButton" parent="VBoxContainer/ScrollContainer/SettingsContainer/AccessibilitySection/ColorblindMode"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+
+[node name="ReduceMotionToggle" type="CheckButton" parent="VBoxContainer/ScrollContainer/SettingsContainer/AccessibilitySection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+text = "Reduce Motion"
+
+[node name="LargeTouchToggle" type="CheckButton" parent="VBoxContainer/ScrollContainer/SettingsContainer/AccessibilitySection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+text = "Large Touch Targets"
+
+[node name="Footer" type="HBoxContainer" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+alignment = 1
+
+[node name="ResetButton" type="Button" parent="VBoxContainer/Footer"]
+custom_minimum_size = Vector2(200, 50)
+layout_mode = 2
+size_flags_vertical = 4
+text = "Reset to Defaults"
+
+[node name="ResetConfirmDialog" type="ConfirmationDialog" parent="."]
+title = "Reset Settings?"
+size = Vector2i(400, 150)
+dialog_text = "This will restore all settings to their default values.
+
+Are you sure?"
+dialog_autowrap = true

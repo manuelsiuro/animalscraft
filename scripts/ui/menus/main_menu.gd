@@ -24,6 +24,7 @@ const GAME_SCENE_PATH := "res://scenes/game.tscn"
 @onready var _settings_button: Button = $VBoxContainer/SettingsButton
 @onready var _exit_button: Button = $VBoxContainer/ExitButton
 @onready var _error_dialog: AcceptDialog = $ErrorDialog
+@onready var _settings_screen: Control = $SettingsScreen
 
 # =============================================================================
 # STATE
@@ -54,6 +55,10 @@ func _ready() -> void:
 	# Connect to EventBus for load events
 	EventBus.load_started.connect(_on_load_started)
 	EventBus.load_completed.connect(_on_load_completed)
+
+	# Connect settings screen back signal
+	if _settings_screen:
+		_settings_screen.back_pressed.connect(_on_settings_back_pressed)
 
 	# Validate game scene exists
 	if not ResourceLoader.exists(GAME_SCENE_PATH):
@@ -138,7 +143,10 @@ func _on_settings_pressed() -> void:
 
 	GameLogger.info("MainMenu", "Settings pressed")
 	EventBus.menu_opened.emit("settings")
-	# Settings panel implementation deferred to future story
+
+	# Show settings screen
+	if _settings_screen:
+		_settings_screen.show_settings()
 
 
 ## Handle Exit button press
@@ -195,3 +203,9 @@ func is_loading() -> bool:
 ## Refresh the Continue button visibility (call after save operations)
 func refresh_continue_button() -> void:
 	_update_continue_button_visibility()
+
+
+## Handle settings screen back button (AC6)
+func _on_settings_back_pressed() -> void:
+	GameLogger.debug("MainMenu", "Settings closed")
+	# Settings screen handles its own hiding

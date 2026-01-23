@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/menus/main_menu.gd" id="1_main_menu"]
+[ext_resource type="PackedScene" path="res://scenes/ui/menus/settings_screen.tscn" id="2_settings_screen"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -76,3 +77,6 @@ size = Vector2i(400, 150)
 dialog_text = "Couldn't load your save.
 Would you like to start a new adventure?"
 dialog_autowrap = true
+
+[node name="SettingsScreen" parent="." instance=ExtResource("2_settings_screen")]
+layout_mode = 1
