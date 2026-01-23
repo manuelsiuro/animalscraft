@@ -404,6 +404,39 @@ func _test_advance_timer(animal_id: String, time: float) -> void:
 		_worker_timers[animal_id] += time
 
 # =============================================================================
+# SERIALIZATION (Story 6-1)
+# =============================================================================
+
+## Serialize processor state for save system.
+## Captures production timers, pause state, and waiting state for all workers.
+## @return Dictionary with serialized state
+func to_dict() -> Dictionary:
+	return {
+		"recipe_id": _recipe.recipe_id if _recipe else "",
+		"worker_timers": _worker_timers.duplicate(),
+		"paused_workers": _paused_workers.keys(),
+		"waiting_for_inputs": _waiting_for_inputs.keys(),
+	}
+
+
+## Restore processor state from saved data.
+## NOTE: Worker references must be reconnected by Building after animals are restored.
+## @param data Dictionary with saved state
+func from_dict(data: Dictionary) -> void:
+	if data.has("worker_timers") and data["worker_timers"] is Dictionary:
+		_worker_timers = data["worker_timers"].duplicate()
+	if data.has("paused_workers") and data["paused_workers"] is Array:
+		_paused_workers.clear()
+		for animal_id in data["paused_workers"]:
+			_paused_workers[animal_id] = true
+	if data.has("waiting_for_inputs") and data["waiting_for_inputs"] is Array:
+		_waiting_for_inputs.clear()
+		for animal_id in data["waiting_for_inputs"]:
+			_waiting_for_inputs[animal_id] = true
+	# Note: _worker_references must be restored separately when animals are loaded
+
+
+# =============================================================================
 # CLEANUP
 # =============================================================================
 

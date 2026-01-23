@@ -303,6 +303,62 @@ func _apply_wild_visual(enabled: bool) -> void:
 				material.albedo_color = Color.WHITE
 
 # =============================================================================
+# SERIALIZATION (Story 6-1)
+# =============================================================================
+
+## Serialize this animal's state for save system.
+## Captures all essential data needed to recreate this animal on load.
+## @return Dictionary with animal state
+func to_dict() -> Dictionary:
+	var data := {
+		"animal_id": get_animal_id(),
+		"hex_coord": hex_coord.to_dict() if hex_coord else null,
+		"is_wild": is_wild,
+		"position": {"x": position.x, "y": position.y, "z": position.z},
+	}
+
+	# Serialize assigned building reference (by save_id for uniqueness - Story 6-1 Code Review fix)
+	if _current_building and _current_building.has_method("get_save_id"):
+		data["assigned_building_save_id"] = _current_building.get_save_id()
+	else:
+		data["assigned_building_save_id"] = null
+
+	# Serialize target building reference (by save_id for uniqueness)
+	if _target_building and _target_building.has_method("get_save_id"):
+		data["target_building_save_id"] = _target_building.get_save_id()
+	else:
+		data["target_building_save_id"] = null
+
+	# Serialize stats from StatsComponent
+	if _stats_component and _stats_component.has_method("to_dict"):
+		data["stats"] = _stats_component.to_dict()
+	elif stats:
+		# Fallback: serialize base stats reference
+		data["stats"] = {
+			"animal_id": stats.animal_id if stats else "",
+			"energy": stats.base_energy if stats else 5,
+			"max_energy": stats.base_energy if stats else 5,
+			"mood": 2,  # Default neutral
+			"speed": stats.base_speed if stats else 3,
+			"strength": stats.base_strength if stats else 2,
+		}
+
+	# Serialize AI state
+	if _ai and _ai.has_method("get_current_state_name"):
+		data["ai_state"] = _ai.get_current_state_name()
+	else:
+		data["ai_state"] = "IDLE"
+
+	return data
+
+
+## Check if this animal can be serialized (is properly initialized).
+## @return True if animal has required data for serialization
+func can_serialize() -> bool:
+	return _initialized and stats != null
+
+
+# =============================================================================
 # CLEANUP
 # =============================================================================
 

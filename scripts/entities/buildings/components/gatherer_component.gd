@@ -259,6 +259,35 @@ func _get_animal_id(animal: Node) -> String:
 	return str(animal.get_instance_id())
 
 # =============================================================================
+# SERIALIZATION (Story 6-1)
+# =============================================================================
+
+## Serialize gatherer state for save system.
+## Captures production timers and pause state for all workers.
+## @return Dictionary with serialized state
+func to_dict() -> Dictionary:
+	return {
+		"output_resource_id": _output_resource_id,
+		"production_time": _production_time,
+		"worker_timers": _worker_timers.duplicate(),
+		"paused_workers": _paused_workers.keys(),
+	}
+
+
+## Restore gatherer state from saved data.
+## NOTE: Worker references must be reconnected by Building after animals are restored.
+## @param data Dictionary with saved state
+func from_dict(data: Dictionary) -> void:
+	if data.has("worker_timers") and data["worker_timers"] is Dictionary:
+		_worker_timers = data["worker_timers"].duplicate()
+	if data.has("paused_workers") and data["paused_workers"] is Array:
+		_paused_workers.clear()
+		for animal_id in data["paused_workers"]:
+			_paused_workers[animal_id] = true
+	# Note: _worker_references must be restored separately when animals are loaded
+
+
+# =============================================================================
 # CLEANUP
 # =============================================================================
 

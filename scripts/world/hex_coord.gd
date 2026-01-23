@@ -113,6 +113,61 @@ func to_vector() -> Vector2i:
 	return Vector2i(q, r)
 
 # =============================================================================
+# SERIALIZATION (Story 6-1)
+# =============================================================================
+
+## Serialize this HexCoord to a dictionary for save system.
+## @return Dictionary with q and r keys
+func to_dict() -> Dictionary:
+	return {"q": q, "r": r}
+
+
+## Create a HexCoord from a serialized dictionary.
+## @param data Dictionary with q and r keys
+## @return New HexCoord instance
+static func from_dict(data: Dictionary) -> HexCoord:
+	var coord_q: int = data.get("q", 0)
+	var coord_r: int = data.get("r", 0)
+	return HexCoord.new(coord_q, coord_r)
+
+
+## Convert a HexCoord to a string key for dictionary storage.
+## Format: "q,r" (e.g., "3,-2")
+## @param coord The HexCoord to convert
+## @return String key representation
+static func coord_to_key(coord: HexCoord) -> String:
+	if coord == null:
+		return "0,0"
+	return "%d,%d" % [coord.q, coord.r]
+
+
+## Create a HexCoord from a string key.
+## @param key String in format "q,r"
+## @return New HexCoord instance
+static func key_to_coord(key: String) -> HexCoord:
+	var parts := key.split(",")
+	if parts.size() < 2:
+		return HexCoord.new(0, 0)
+	return HexCoord.new(int(parts[0]), int(parts[1]))
+
+
+## Convert a Vector2i to a string key for dictionary storage.
+## @param vec The Vector2i to convert
+## @return String key representation
+static func vec_to_key(vec: Vector2i) -> String:
+	return "%d,%d" % [vec.x, vec.y]
+
+
+## Create a Vector2i from a string key.
+## @param key String in format "q,r"
+## @return Vector2i
+static func key_to_vec(key: String) -> Vector2i:
+	var parts := key.split(",")
+	if parts.size() < 2:
+		return Vector2i.ZERO
+	return Vector2i(int(parts[0]), int(parts[1]))
+
+# =============================================================================
 # STRING REPRESENTATION
 # =============================================================================
 

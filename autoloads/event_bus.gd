@@ -267,9 +267,17 @@ signal game_paused()
 ## Emitted when the game is resumed from pause.
 signal game_resumed()
 
+## Emitted when a save operation starts (for UI feedback).
+## Story 6-1: Added for save system integration.
+signal save_started()
+
 ## Emitted when a save operation completes.
 ## @param success True if the save was successful
 signal save_completed(success: bool)
+
+## Emitted when a load operation starts (for UI feedback).
+## Story 6-1: Added for save system integration.
+signal load_started()
 
 ## Emitted when a load operation completes.
 ## @param success True if the load was successful

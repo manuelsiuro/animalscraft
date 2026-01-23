@@ -330,6 +330,35 @@ func get_effective_stat(stat_name: String) -> float:
 			return 0.0
 
 # =============================================================================
+# SERIALIZATION (Story 6-1)
+# =============================================================================
+
+## Serialize runtime stats for save system.
+## Captures current energy, mood, and base stats reference.
+## @return Dictionary with serialized state
+func to_dict() -> Dictionary:
+	return {
+		"animal_id": get_animal_id(),
+		"energy": _current_energy,
+		"max_energy": get_max_energy(),
+		"mood": _current_mood as int,
+		"speed": get_speed(),
+		"strength": get_strength(),
+	}
+
+
+## Restore runtime stats from saved data.
+## @param data Dictionary with saved state
+func from_dict(data: Dictionary) -> void:
+	if data.has("energy"):
+		_current_energy = data["energy"]
+	if data.has("mood"):
+		_current_mood = data["mood"] as Mood
+	# Note: Base stats are restored via initialize() with AnimalStats resource
+	# speed/strength are read from _base_stats, not stored in from_dict
+
+
+# =============================================================================
 # DEBUG / STRING
 # =============================================================================
 

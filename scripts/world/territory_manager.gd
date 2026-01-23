@@ -938,6 +938,149 @@ func _emit_territory_reclaimed(hex_vec: Vector2i) -> void:
 	EventBus.territory_reclaimed_by_wild.emit(hex_vec)
 
 
+# =============================================================================
+# SERIALIZATION (Story 6-1)
+# =============================================================================
+
+## Serialize TerritoryManager state for save system.
+## Captures ownership, neglect timers, reclamation progress, and territory states.
+## @return Dictionary with all state data
+func to_dict() -> Dictionary:
+	var data := {
+		"ownership": {},
+		"claim_source": {},
+		"territory_states": {},
+		"neglect_timers": {},
+		"reclamation_timers": {},
+		"reclamation_started": {},
+		"player_count": _player_count,
+	}
+
+	# Serialize ownership (Vector2i -> String key)
+	for hex_vec in _ownership.keys():
+		var key := HexCoord.vec_to_key(hex_vec)
+		data["ownership"][key] = _ownership[hex_vec]
+
+	# Serialize claim sources
+	for hex_vec in _claim_source.keys():
+		var key := HexCoord.vec_to_key(hex_vec)
+		data["claim_source"][key] = _claim_source[hex_vec]
+
+	# Serialize territory states (convert enum to int)
+	for hex_vec in _territory_states.keys():
+		var key := HexCoord.vec_to_key(hex_vec)
+		data["territory_states"][key] = _territory_states[hex_vec] as int
+
+	# Serialize neglect timers
+	for hex_vec in _neglect_timers.keys():
+		var key := HexCoord.vec_to_key(hex_vec)
+		data["neglect_timers"][key] = _neglect_timers[hex_vec]
+
+	# Serialize reclamation timers
+	for hex_vec in _reclamation_timers.keys():
+		var key := HexCoord.vec_to_key(hex_vec)
+		data["reclamation_timers"][key] = _reclamation_timers[hex_vec]
+
+	# Serialize reclamation started flags
+	for hex_vec in _reclamation_started.keys():
+		var key := HexCoord.vec_to_key(hex_vec)
+		data["reclamation_started"][key] = _reclamation_started[hex_vec]
+
+	return data
+
+
+## Restore TerritoryManager state from save data.
+## Clears existing state and rebuilds from saved data.
+## NOTE: Signal emission is suppressed during load (checked via SaveManager.is_loading()).
+## @param data Dictionary with saved state
+func from_dict(data: Dictionary) -> void:
+	# Clear existing state
+	_ownership.clear()
+	_claim_source.clear()
+	_territory_states.clear()
+	_neglect_timers.clear()
+	_reclamation_timers.clear()
+	_reclamation_started.clear()
+	_player_hex_list.clear()
+	_next_check_index = 0
+	_player_count = 0
+
+	# Restore ownership
+	if data.has("ownership") and data["ownership"] is Dictionary:
+		var ownership_data: Dictionary = data["ownership"]
+		for key in ownership_data.keys():
+			var hex_vec := HexCoord.key_to_vec(key)
+			_ownership[hex_vec] = ownership_data[key]
+
+	# Restore claim sources
+	if data.has("claim_source") and data["claim_source"] is Dictionary:
+		var source_data: Dictionary = data["claim_source"]
+		for key in source_data.keys():
+			var hex_vec := HexCoord.key_to_vec(key)
+			_claim_source[hex_vec] = source_data[key]
+
+	# Restore territory states
+	if data.has("territory_states") and data["territory_states"] is Dictionary:
+		var state_data: Dictionary = data["territory_states"]
+		for key in state_data.keys():
+			var hex_vec := HexCoord.key_to_vec(key)
+			_territory_states[hex_vec] = state_data[key] as TerritoryState
+
+	# Restore neglect timers
+	if data.has("neglect_timers") and data["neglect_timers"] is Dictionary:
+		var timer_data: Dictionary = data["neglect_timers"]
+		for key in timer_data.keys():
+			var hex_vec := HexCoord.key_to_vec(key)
+			_neglect_timers[hex_vec] = timer_data[key]
+
+	# Restore reclamation timers
+	if data.has("reclamation_timers") and data["reclamation_timers"] is Dictionary:
+		var reclaim_data: Dictionary = data["reclamation_timers"]
+		for key in reclaim_data.keys():
+			var hex_vec := HexCoord.key_to_vec(key)
+			_reclamation_timers[hex_vec] = reclaim_data[key]
+
+	# Restore reclamation started flags
+	if data.has("reclamation_started") and data["reclamation_started"] is Dictionary:
+		var started_data: Dictionary = data["reclamation_started"]
+		for key in started_data.keys():
+			var hex_vec := HexCoord.key_to_vec(key)
+			_reclamation_started[hex_vec] = started_data[key]
+
+	# Restore player count
+	if data.has("player_count"):
+		_player_count = data["player_count"]
+	else:
+		# Recalculate if not stored
+		_player_count = 0
+		for hex_vec in _ownership.keys():
+			if _ownership[hex_vec] == "player":
+				_player_count += 1
+
+	# Rebuild player hex list for neglect processing
+	_rebuild_player_hex_list()
+
+	# Apply visual states to tiles (if WorldManager available)
+	_apply_visual_states()
+
+	if is_instance_valid(GameLogger):
+		GameLogger.info("TerritoryManager", "Restored state: %d owned hexes, %d neglect timers" % [_ownership.size(), _neglect_timers.size()])
+
+
+## Apply visual territory states to tiles after load.
+## Called internally by from_dict() after state restoration.
+func _apply_visual_states() -> void:
+	if not _world_manager:
+		return
+
+	for hex_vec in _territory_states.keys():
+		var hex := HexCoord.from_vector(hex_vec)
+		var state: TerritoryState = _territory_states[hex_vec]
+		var tile := _world_manager.get_tile_at(hex)
+		if tile and tile.has_method("set_territory_state"):
+			tile.set_territory_state(state)
+
+
 ## Spawn a small wild herd at a reclaimed hex.
 ## Uses WildHerdManager if available.
 ##

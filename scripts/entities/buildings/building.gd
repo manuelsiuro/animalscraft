@@ -33,6 +33,10 @@ var _initialized: bool = false
 ## Track if production has been started (for signal emission) (Story 3-8)
 var _production_active: bool = false
 
+## Unique instance ID for serialization (Story 6-1: Code Review fix)
+## Format: "building_type@q,r" (e.g., "lumber_mill@3,-2")
+var _instance_id: String = ""
+
 # =============================================================================
 # COMPONENTS (child nodes, assigned in _ready)
 # =============================================================================
@@ -114,6 +118,12 @@ func initialize(hex: HexCoord, building_data: BuildingData) -> void:
 
 	# Mark hex as occupied
 	_mark_hex_occupied()
+
+	# Generate unique instance ID (Story 6-1: Code Review fix)
+	if hex and building_data:
+		_instance_id = "%s@%d,%d" % [building_data.building_id, hex.q, hex.r]
+	else:
+		_instance_id = "unknown@%d" % get_instance_id()
 
 	_initialized = true
 
@@ -328,6 +338,13 @@ func get_building_id() -> String:
 	return ""
 
 
+## Get the building's unique instance identifier for serialization (Story 6-1: Code Review fix).
+## Format: "building_type@q,r" (e.g., "lumber_mill@3,-2")
+## @return Unique instance ID string
+func get_save_id() -> String:
+	return _instance_id
+
+
 ## Get the building's type
 func get_building_type() -> BuildingTypes.BuildingType:
 	if data:
@@ -387,6 +404,52 @@ func get_shelter() -> Node:
 ## @return true if this building has a ShelterComponent
 func is_shelter() -> bool:
 	return _shelter != null and _shelter.is_initialized()
+
+# =============================================================================
+# SERIALIZATION (Story 6-1)
+# =============================================================================
+
+## Serialize this building's state for save system.
+## Captures all essential data needed to recreate this building on load.
+## @return Dictionary with building state
+func to_dict() -> Dictionary:
+	var building_data := {
+		"save_id": _instance_id,  # Unique save ID for save/load matching
+		"building_id": get_building_id(),
+		"hex_coord": hex_coord.to_dict() if hex_coord else null,
+		"position": {"x": position.x, "y": position.y, "z": position.z},
+		"production_active": _production_active,
+	}
+
+	# Serialize worker IDs (not node references)
+	var worker_ids: Array[String] = []
+	if _worker_slots:
+		var workers := _worker_slots.get_workers()
+		for worker in workers:
+			if worker and worker.has_method("get_animal_id"):
+				worker_ids.append(worker.get_animal_id())
+	building_data["worker_ids"] = worker_ids
+
+	# Serialize GathererComponent state
+	if _gatherer and _gatherer.has_method("to_dict"):
+		building_data["gatherer"] = _gatherer.to_dict()
+
+	# Serialize ProcessorComponent state
+	if _processor and _processor.has_method("to_dict"):
+		building_data["processor"] = _processor.to_dict()
+
+	# Serialize ShelterComponent state
+	if _shelter and _shelter.has_method("to_dict"):
+		building_data["shelter"] = _shelter.to_dict()
+
+	return building_data
+
+
+## Check if this building can be serialized (is properly initialized).
+## @return True if building has required data for serialization
+func can_serialize() -> bool:
+	return _initialized and data != null
+
 
 # =============================================================================
 # CLEANUP

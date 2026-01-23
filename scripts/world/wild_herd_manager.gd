@@ -531,6 +531,129 @@ func _on_fog_revealed(hex_coord: Vector2i) -> void:
 			GameLogger.info("WildHerdManager", "Spawned wild herd at newly revealed hex %s, emitting contested_territory_discovered" % hex_coord)
 
 # =============================================================================
+# SERIALIZATION (Story 6-1)
+# =============================================================================
+
+## Serialize WildHerdManager state for save system.
+## Captures all herd data including positions, compositions, and IDs.
+## NOTE: Animals themselves are NOT serialized here - they're serialized by their manager.
+## We serialize the herd structure and will recreate animals on load.
+## @return Dictionary with all state data
+func to_dict() -> Dictionary:
+	var data := {
+		"herds": [],
+		"next_herd_id": _next_herd_id,
+		"player_start_hex": null,
+	}
+
+	# Serialize player start hex
+	if _player_start_hex:
+		data["player_start_hex"] = _player_start_hex.to_dict()
+
+	# Serialize each herd
+	for herd_id in _herds.keys():
+		var herd: WildHerd = _herds[herd_id]
+		var herd_data := {
+			"herd_id": herd.herd_id,
+			"hex_coord": herd.hex_coord.to_dict() if herd.hex_coord else null,
+			"owner_id": herd.owner_id,
+			"biome": herd.biome,
+			"animal_types": herd.get_animal_types(),
+			"animal_count": herd.get_animal_count(),
+		}
+		data["herds"].append(herd_data)
+
+	return data
+
+
+## Restore WildHerdManager state from save data.
+## Clears existing herds and recreates them from saved data.
+## NOTE: This recreates herd structures and animals. Called during load sequence.
+## @param data Dictionary with saved state
+func from_dict(data: Dictionary) -> void:
+	# Clean up existing herds (including their animals)
+	# Story 6-1 Code Review fix: Duplicate arrays before cleanup to avoid mutation during iteration
+	for herd_id in _herds.keys():
+		var herd: WildHerd = _herds[herd_id]
+		var animals_to_cleanup := herd.animals.duplicate()
+		herd.animals.clear()  # Clear reference first
+		for animal in animals_to_cleanup:
+			if is_instance_valid(animal):
+				animal.cleanup()
+	_herds.clear()
+	_hex_to_herd.clear()
+
+	# Restore next_herd_id
+	if data.has("next_herd_id"):
+		_next_herd_id = data["next_herd_id"]
+
+	# Restore player start hex
+	if data.has("player_start_hex") and data["player_start_hex"] != null:
+		_player_start_hex = HexCoord.from_dict(data["player_start_hex"])
+
+	# Restore herds
+	if data.has("herds") and data["herds"] is Array:
+		var herds_data: Array = data["herds"]
+		for herd_data in herds_data:
+			if herd_data is Dictionary:
+				_restore_herd(herd_data)
+
+	if is_instance_valid(GameLogger):
+		GameLogger.info("WildHerdManager", "Restored state: %d herds, next_id=%d" % [_herds.size(), _next_herd_id])
+
+
+## Restore a single herd from saved data.
+## Recreates the herd structure and spawns its animals.
+## @param herd_data Dictionary with herd information
+func _restore_herd(herd_data: Dictionary) -> void:
+	var herd_id: String = herd_data.get("herd_id", "")
+	if herd_id.is_empty():
+		if is_instance_valid(GameLogger):
+			GameLogger.warn("WildHerdManager", "Cannot restore herd with empty ID")
+		return
+
+	var hex_data = herd_data.get("hex_coord")
+	if hex_data == null:
+		if is_instance_valid(GameLogger):
+			GameLogger.warn("WildHerdManager", "Cannot restore herd %s: no hex_coord" % herd_id)
+		return
+
+	var hex := HexCoord.from_dict(hex_data)
+	var owner_id: String = herd_data.get("owner_id", "wild")
+	var biome: String = herd_data.get("biome", "plains")
+	var animal_types: Array = herd_data.get("animal_types", [])
+	var animal_count: int = herd_data.get("animal_count", 0)
+
+	# If we don't have animal types but have count, use defaults
+	if animal_types.is_empty() and animal_count > 0:
+		for i in animal_count:
+			animal_types.append("rabbit")
+
+	# Create herd structure
+	var herd := WildHerd.new(herd_id, hex, owner_id)
+	herd.biome = biome
+
+	# Spawn animals for this herd
+	var offsets := _calculate_visual_offsets(animal_types.size())
+	for i in animal_types.size():
+		var animal_type: String = animal_types[i] if i < animal_types.size() else "rabbit"
+		var offset: Vector3 = offsets[i] if i < offsets.size() else Vector3.ZERO
+		var animal := _create_wild_animal(animal_type, hex, offset)
+		if animal:
+			herd.animals.append(animal)
+
+	# Store herd
+	_herds[herd_id] = herd
+	_hex_to_herd[hex.to_vector()] = herd_id
+
+	# NOTE: We don't set territory ownership here - TerritoryManager handles its own state
+	# NOTE: We don't emit wild_herd_spawned signal during load (SaveManager.is_loading())
+
+	if is_instance_valid(GameLogger):
+		GameLogger.debug("WildHerdManager", "Restored herd %s at %s with %d animals" % [herd_id, hex.to_vector(), herd.get_animal_count()])
+
+
+# =============================================================================
 # ANIMAL CREATION HELPERS
 # =============================================================================
 
