@@ -31,6 +31,15 @@ const NEGLECT_THRESHOLD: float = 300.0
 ## Interval for checking neglect status (10 seconds)
 const NEGLECT_CHECK_INTERVAL: float = 10.0
 
+## Time for wild to reclaim a neglected hex adjacent to wild territory (1 minute)
+const RECLAMATION_TIME: float = 60.0
+
+## Radius for activity detection (1 = adjacent hexes reset timer)
+const ACTIVITY_DETECTION_RADIUS: int = 1
+
+## Maximum hexes to process per frame for performance (Story 5-10 AC18)
+const MAX_HEXES_PER_FRAME: int = 15
+
 # =============================================================================
 # PROPERTIES
 # =============================================================================
@@ -43,8 +52,24 @@ var _territory_states: Dictionary = {}
 ## Vector2i -> float (time since last activity)
 var _neglect_timers: Dictionary = {}
 
+## Dictionary of reclamation timers keyed by Vector2i
+## Vector2i -> float (time towards reclamation)
+var _reclamation_timers: Dictionary = {}
+
 ## Reference to WorldManager for tile access
 var _world_manager: WorldManager
+
+## Timer for staggered neglect checking (Story 5-10 performance)
+var _check_timer: float = 0.0
+
+## List of player-owned hexes for staggered processing
+var _player_hex_list: Array[Vector2i] = []
+
+## Index for staggered processing
+var _next_check_index: int = 0
+
+## Track hexes that have started reclamation (for signal emission)
+var _reclamation_started: Dictionary = {}
 
 # =============================================================================
 # OWNERSHIP PROPERTIES (Story 5-1)
@@ -193,9 +218,154 @@ func _emit_state_change_signals(hex_vec: Vector2i, old_state: TerritoryState, ne
 # =============================================================================
 
 func _physics_process(delta: float) -> void:
-	# Periodic neglect check (Story 5.10 will use this for reclamation)
-	# For now, placeholder for future feature
-	pass
+	# Story 5-10: Neglect and reclamation processing
+	_check_timer += delta
+
+	# Calculate interval based on number of batches needed
+	var batch_count := _get_batch_count()
+	var batch_interval := NEGLECT_CHECK_INTERVAL / maxf(float(batch_count), 1.0)
+
+	if _check_timer < batch_interval:
+		return
+
+	_check_timer = 0.0
+	_process_neglect_batch(delta * float(batch_count))  # Scale delta for accumulated time
+
+
+## Get number of batches needed to process all player hexes.
+## @return Number of batches (minimum 1)
+func _get_batch_count() -> int:
+	var hex_count := _player_hex_list.size()
+	if hex_count <= MAX_HEXES_PER_FRAME:
+		return 1
+	return ceili(float(hex_count) / float(MAX_HEXES_PER_FRAME))
+
+
+## Process a batch of player hexes for neglect checking.
+## @param accumulated_delta Time since last check for this batch
+func _process_neglect_batch(accumulated_delta: float) -> void:
+	# Rebuild hex list periodically (at start of cycle)
+	if _next_check_index == 0:
+		_rebuild_player_hex_list()
+
+	var count := 0
+	while count < MAX_HEXES_PER_FRAME and _next_check_index < _player_hex_list.size():
+		var hex_vec := _player_hex_list[_next_check_index]
+		_update_single_hex_neglect(hex_vec, accumulated_delta)
+		_next_check_index += 1
+		count += 1
+
+	# Reset index when cycle completes
+	if _next_check_index >= _player_hex_list.size():
+		_next_check_index = 0
+
+
+## Rebuild the list of player-owned hexes for processing.
+func _rebuild_player_hex_list() -> void:
+	_player_hex_list.clear()
+	for hex_vec in _ownership.keys():
+		if _ownership.get(hex_vec, "") == "player":
+			_player_hex_list.append(hex_vec)
+
+
+## Update neglect and reclamation state for a single hex.
+## @param hex_vec The hex coordinate as Vector2i
+## @param delta Time since last update
+func _update_single_hex_neglect(hex_vec: Vector2i, delta: float) -> void:
+	var hex := HexCoord.from_vector(hex_vec)
+
+	# Check for activity near this hex
+	if _check_activity_near_hex(hex):
+		# Activity detected - reset timers
+		if _neglect_timers.has(hex_vec):
+			_neglect_timers.erase(hex_vec)
+			_reclamation_timers.erase(hex_vec)
+			_reclamation_started.erase(hex_vec)
+
+			# If hex was NEGLECTED, revert to CLAIMED
+			var current_state := get_territory_state(hex)
+			if current_state == TerritoryState.NEGLECTED:
+				set_territory_state(hex, TerritoryState.CLAIMED)
+				if is_instance_valid(GameLogger):
+					GameLogger.debug("TerritoryManager", "Hex %s reverted from NEGLECTED to CLAIMED (activity detected)" % hex_vec)
+
+			# Emit activity detected signal (deferred for proper ordering)
+			call_deferred("_emit_activity_detected", hex_vec)
+		return
+
+	# No activity - increment neglect timer
+	var current_neglect: float = _neglect_timers.get(hex_vec, 0.0)
+	current_neglect += delta
+	_neglect_timers[hex_vec] = current_neglect
+
+	# Check if hex should become neglected
+	var current_state := get_territory_state(hex)
+	if current_neglect >= NEGLECT_THRESHOLD and current_state != TerritoryState.NEGLECTED:
+		set_territory_state(hex, TerritoryState.NEGLECTED)
+		call_deferred("_emit_territory_neglected", hex_vec)
+		if is_instance_valid(GameLogger):
+			GameLogger.info("TerritoryManager", "Hex %s became NEGLECTED (no activity for %.0fs)" % [hex_vec, current_neglect])
+
+	# Process reclamation for neglected hexes adjacent to wild
+	if current_state == TerritoryState.NEGLECTED or current_neglect >= NEGLECT_THRESHOLD:
+		_update_reclamation_timer(hex, hex_vec, delta)
+
+
+## Emit territory_activity_detected signal (called deferred).
+## @param hex_vec The hex coordinate
+func _emit_activity_detected(hex_vec: Vector2i) -> void:
+	EventBus.territory_activity_detected.emit(hex_vec)
+
+
+## Emit territory_neglected signal (called deferred).
+## @param hex_vec The hex coordinate
+func _emit_territory_neglected(hex_vec: Vector2i) -> void:
+	EventBus.territory_neglected.emit(hex_vec)
+
+
+## Reset neglect timers for a hex and its neighbors (AC4).
+## Called immediately when buildings are placed/removed.
+##
+## @param hex The central hex around which to reset timers
+func _reset_neglect_timers_around(hex: HexCoord) -> void:
+	if hex == null:
+		return
+
+	# Reset timer for this hex
+	var hex_vec := hex.to_vector()
+	_reset_single_hex_neglect(hex_vec)
+
+	# Reset timers for all neighbors within ACTIVITY_DETECTION_RADIUS
+	var neighbors := hex.get_neighbors()
+	for neighbor in neighbors:
+		_reset_single_hex_neglect(neighbor.to_vector())
+
+
+## Reset neglect state for a single hex.
+## Clears timers and reverts NEGLECTED state to CLAIMED if player-owned.
+##
+## @param hex_vec The hex coordinate as Vector2i
+func _reset_single_hex_neglect(hex_vec: Vector2i) -> void:
+	# Only process if hex has a neglect timer
+	if not _neglect_timers.has(hex_vec):
+		return
+
+	# Clear timers
+	_neglect_timers.erase(hex_vec)
+	_reclamation_timers.erase(hex_vec)
+	_reclamation_started.erase(hex_vec)
+
+	# Revert NEGLECTED state to CLAIMED if still player-owned
+	var hex := HexCoord.from_vector(hex_vec)
+	if get_hex_owner(hex) == "player":
+		var current_state := get_territory_state(hex)
+		if current_state == TerritoryManager.TerritoryState.NEGLECTED:
+			set_territory_state(hex, TerritoryManager.TerritoryState.CLAIMED)
+			if is_instance_valid(GameLogger):
+				GameLogger.debug("TerritoryManager", "Hex %s reverted from NEGLECTED to CLAIMED (building activity)" % hex_vec)
+
+	# Emit activity detected signal
+	call_deferred("_emit_activity_detected", hex_vec)
 
 # =============================================================================
 # UTILITIES
@@ -408,7 +578,7 @@ func is_combat_claimed(hex: HexCoord) -> bool:
 # BUILDING INTEGRATION (Story 5-1)
 # =============================================================================
 
-## Handle building placement - auto-claim unowned territory.
+## Handle building placement - auto-claim unowned territory and reset neglect timers (AC4).
 ##
 ## @param building The placed building node
 ## @param hex_coord The hex coordinate where building was placed
@@ -421,6 +591,9 @@ func _on_building_placed(building: Node, hex_coord: Vector2i) -> void:
 		set_hex_owner(hex, "player", "building")
 		if is_instance_valid(GameLogger):
 			GameLogger.info("TerritoryManager", "Auto-claimed hex %s for player (building placed)" % hex_coord)
+
+	# AC4: Reset neglect timers for this hex and adjacent hexes immediately
+	_reset_neglect_timers_around(hex)
 
 
 ## Handle building removal - revert to unowned if no other buildings and not combat-claimed.
@@ -620,3 +793,186 @@ func get_all_adjacent_contested() -> Array[HexCoord]:
 				result.append(contested_hex)
 
 	return result
+
+
+# =============================================================================
+# STORY 5-10: NEGLECT AND RECLAMATION SYSTEM
+# =============================================================================
+
+## Check for player activity near a hex (buildings or animals).
+## Activity within ACTIVITY_DETECTION_RADIUS resets neglect timer.
+##
+## @param hex The hex to check around
+## @return True if player activity detected nearby
+func _check_activity_near_hex(hex: HexCoord) -> bool:
+	if hex == null:
+		return false
+
+	# Check for buildings at this hex and neighbors
+	if _has_buildings_at(hex):
+		return true
+
+	var neighbors := hex.get_neighbors()
+	for neighbor in neighbors:
+		if _has_buildings_at(neighbor):
+			return true
+
+	# Check for player animals nearby
+	var world_pos := HexGrid.hex_to_world(hex)
+	var detection_radius := GameConstants.HEX_SIZE * float(ACTIVITY_DETECTION_RADIUS + 1)
+	var animals := get_tree().get_nodes_in_group("animals")
+
+	for animal in animals:
+		if not is_instance_valid(animal):
+			continue
+
+		# Skip wild animals (check for wild indicator)
+		if animal.has_method("is_wild") and animal.is_wild():
+			continue
+
+		# Cast to Node3D for position access
+		var animal_node := animal as Node3D
+		if not animal_node:
+			continue
+
+		var distance: float = animal_node.global_position.distance_to(world_pos)
+		if distance <= detection_radius:
+			return true
+
+	return false
+
+
+## Check if a hex is adjacent to wild territory.
+## Only neglected hexes adjacent to wild can be reclaimed.
+##
+## @param hex The hex to check
+## @return True if adjacent to wild/camp territory
+func _is_adjacent_to_wild(hex: HexCoord) -> bool:
+	if hex == null:
+		return false
+
+	var neighbors := hex.get_neighbors()
+	for neighbor in neighbors:
+		var owner := get_hex_owner(neighbor)
+		if owner == "wild" or owner.begins_with("camp_"):
+			return true
+
+	return false
+
+
+## Update reclamation timer for a neglected hex.
+## Only processes hexes adjacent to wild territory.
+##
+## @param hex The hex to update
+## @param hex_vec The hex as Vector2i
+## @param delta Time since last update
+func _update_reclamation_timer(hex: HexCoord, hex_vec: Vector2i, delta: float) -> void:
+	# Only reclaim if adjacent to wild territory
+	if not _is_adjacent_to_wild(hex):
+		# Not adjacent to wild - clear reclamation timer if exists
+		_reclamation_timers.erase(hex_vec)
+		_reclamation_started.erase(hex_vec)
+		return
+
+	# Increment reclamation timer
+	var current_reclamation: float = _reclamation_timers.get(hex_vec, 0.0)
+
+	# Emit reclamation started signal on first increment
+	if current_reclamation == 0.0 and not _reclamation_started.has(hex_vec):
+		_reclamation_started[hex_vec] = true
+		call_deferred("_emit_reclamation_started", hex_vec, RECLAMATION_TIME)
+		if is_instance_valid(GameLogger):
+			GameLogger.info("TerritoryManager", "Reclamation started at hex %s (adjacent to wild)" % hex_vec)
+
+	current_reclamation += delta
+	_reclamation_timers[hex_vec] = current_reclamation
+
+	# Check if reclamation complete
+	if current_reclamation >= RECLAMATION_TIME:
+		_reclaim_hex_for_wild(hex, hex_vec)
+
+
+## Emit territory_reclamation_started signal (called deferred).
+## @param hex_vec The hex coordinate
+## @param estimated_time Time until reclamation completes
+func _emit_reclamation_started(hex_vec: Vector2i, estimated_time: float) -> void:
+	EventBus.territory_reclamation_started.emit(hex_vec, estimated_time)
+
+
+## Reclaim a hex for wild territory.
+## Changes ownership, spawns a herd, and emits signals.
+## NOTE: Reclamation only completes if a herd can spawn (AC14 guarantee).
+##
+## @param hex The hex to reclaim
+## @param hex_vec The hex as Vector2i
+func _reclaim_hex_for_wild(hex: HexCoord, hex_vec: Vector2i) -> void:
+	if is_instance_valid(GameLogger):
+		GameLogger.info("TerritoryManager", "Wild attempting to reclaim hex %s" % hex_vec)
+
+	# Try to spawn a herd FIRST - only complete reclamation if successful (AC14)
+	var herd_spawned := _spawn_reclamation_herd(hex)
+
+	if not herd_spawned:
+		# Cannot complete reclamation without a herd to fight
+		# Keep hex as NEGLECTED and hold reclamation timer at threshold
+		# Will retry on next cycle when herd slot becomes available
+		if is_instance_valid(GameLogger):
+			GameLogger.warn("TerritoryManager", "Reclamation delayed at %s - waiting for herd slot" % hex_vec)
+		return
+
+	# Herd spawned successfully - now complete ownership change
+	set_hex_owner(hex, "wild", "reclamation")
+
+	# Emit reclaimed signal
+	call_deferred("_emit_territory_reclaimed", hex_vec)
+
+	# Clean up timers
+	_neglect_timers.erase(hex_vec)
+	_reclamation_timers.erase(hex_vec)
+	_reclamation_started.erase(hex_vec)
+
+
+## Emit territory_reclaimed_by_wild signal (called deferred).
+## @param hex_vec The hex coordinate
+func _emit_territory_reclaimed(hex_vec: Vector2i) -> void:
+	EventBus.territory_reclaimed_by_wild.emit(hex_vec)
+
+
+## Spawn a small wild herd at a reclaimed hex.
+## Uses WildHerdManager if available.
+##
+## @param hex The hex to spawn at
+## @return True if herd was spawned successfully, false otherwise
+func _spawn_reclamation_herd(hex: HexCoord) -> bool:
+	if not _world_manager:
+		if is_instance_valid(GameLogger):
+			GameLogger.warn("TerritoryManager", "Cannot spawn reclamation herd: no WorldManager")
+		return false
+
+	# Access WildHerdManager through WorldManager
+	if not _world_manager.has_method("get_wild_herd_manager"):
+		# Try direct property access
+		if _world_manager.get("_wild_herd_manager") == null:
+			if is_instance_valid(GameLogger):
+				GameLogger.warn("TerritoryManager", "Cannot spawn reclamation herd: no WildHerdManager")
+			return false
+
+	var wild_herd_manager = _world_manager.get("_wild_herd_manager")
+	if not wild_herd_manager:
+		if is_instance_valid(GameLogger):
+			GameLogger.warn("TerritoryManager", "Cannot spawn reclamation herd: WildHerdManager is null")
+		return false
+
+	# Small reclamation herd (2-3 animals)
+	var herd_size := randi_range(2, 3)
+	var herd = wild_herd_manager.spawn_herd(hex, herd_size, "wild")
+
+	if herd:
+		if is_instance_valid(GameLogger):
+			GameLogger.info("TerritoryManager", "Reclamation herd spawned at %s with %d animals" % [hex.to_vector(), herd_size])
+		return true
+	else:
+		# Max herds reached or other failure
+		if is_instance_valid(GameLogger):
+			GameLogger.debug("TerritoryManager", "Could not spawn reclamation herd at %s (may be at max herds)" % hex.to_vector())
+		return false

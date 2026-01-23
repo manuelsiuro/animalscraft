@@ -162,6 +162,27 @@ signal combat_requested(hex_coord: Vector2i, herd_id: String)
 ## @param herd_id The wild herd at that location
 signal contested_territory_discovered(hex_coord: Vector2i, herd_id: String)
 
+## Story 5-10: Emitted when a player hex transitions to neglected state.
+## Fired when hex has no nearby activity for NEGLECT_THRESHOLD time.
+## @param hex_coord The neglected hex location
+signal territory_neglected(hex_coord: Vector2i)
+
+## Story 5-10: Emitted when reclamation timer starts on a neglected hex.
+## Only fires for neglected hexes adjacent to wild territory.
+## @param hex_coord The hex being reclaimed
+## @param estimated_time Seconds until reclamation completes
+signal territory_reclamation_started(hex_coord: Vector2i, estimated_time: float)
+
+## Story 5-10: Emitted when wild animals successfully reclaim a neglected hex.
+## Fired after ownership changes and herd spawns.
+## @param hex_coord The reclaimed hex location
+signal territory_reclaimed_by_wild(hex_coord: Vector2i)
+
+## Story 5-10: Emitted when player activity resets a hex's neglect timer.
+## Used by UI to show activity feedback (e.g., timer reset indicator).
+## @param hex_coord The hex where activity was detected
+signal territory_activity_detected(hex_coord: Vector2i)
+
 # =============================================================================
 # PROGRESSION EVENTS
 # =============================================================================
