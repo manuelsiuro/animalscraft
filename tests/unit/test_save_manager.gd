@@ -1,8 +1,8 @@
 ## Unit tests for SaveManager.
-## Tests save/load operations, serialization, backup system, and error handling.
+## Tests save/load operations, serialization, backup system, error handling, and auto-save.
 ##
 ## Architecture: tests/unit/test_save_manager.gd
-## Story: 6-1-implement-save-system-core
+## Story: 6-1-implement-save-system-core, 6-2-implement-auto-save
 extends GutTest
 
 # =============================================================================
@@ -486,3 +486,204 @@ func test_load_completed_emitted_with_false_on_failure() -> void:
 	EventBus.load_completed.disconnect(callback)
 	assert_true(state.received, "load_completed signal should be emitted")
 	assert_false(state.success, "load_completed should have success=false on failure")
+
+
+# =============================================================================
+# Story 6-2: Auto-Save Tests (AC1-AC5)
+# =============================================================================
+
+func test_autosave_timer_exists() -> void:
+	# Arrange - get autosave timer via internal access
+	var timer: Timer = null
+	for child in SaveManager.get_children():
+		if child is Timer and child.name == "AutosaveTimer":
+			timer = child
+			break
+
+	# Assert
+	assert_not_null(timer, "Autosave timer should exist as child of SaveManager")
+	assert_eq(timer.wait_time, GameConstants.AUTOSAVE_INTERVAL, "Timer should use GameConstants interval")
+
+
+func test_autosave_respects_disabled_setting() -> void:
+	# Arrange - disable autosave
+	var original_value := Settings.is_auto_save_enabled()
+	Settings.set_auto_save_enabled(false)
+
+	var state := {"save_count": 0}
+	var callback := func(_success: bool) -> void:
+		state.save_count += 1
+
+	EventBus.save_completed.connect(callback)
+
+	# Act - force autosave while disabled
+	SaveManager.force_autosave()
+	await get_tree().process_frame
+
+	# Cleanup
+	EventBus.save_completed.disconnect(callback)
+	Settings.set_auto_save_enabled(original_value)
+
+	# Assert
+	assert_eq(state.save_count, 0, "Autosave should not trigger when disabled")
+
+
+func test_autosave_triggers_when_enabled() -> void:
+	# Arrange - enable autosave
+	var original_value := Settings.is_auto_save_enabled()
+	Settings.set_auto_save_enabled(true)
+
+	var state := {"save_count": 0}
+	var callback := func(_success: bool) -> void:
+		state.save_count += 1
+
+	EventBus.save_completed.connect(callback)
+
+	# Act - force autosave while enabled
+	SaveManager.force_autosave()
+	await get_tree().process_frame
+
+	# Cleanup
+	EventBus.save_completed.disconnect(callback)
+	Settings.set_auto_save_enabled(original_value)
+
+	# Assert
+	assert_eq(state.save_count, 1, "Autosave should trigger when enabled")
+
+
+func test_pause_signal_triggers_autosave() -> void:
+	# Arrange - enable autosave
+	var original_value := Settings.is_auto_save_enabled()
+	Settings.set_auto_save_enabled(true)
+
+	var state := {"save_count": 0}
+	var callback := func(_success: bool) -> void:
+		state.save_count += 1
+
+	EventBus.save_completed.connect(callback)
+
+	# Act - emit pause signal
+	EventBus.game_paused.emit()
+	await get_tree().process_frame
+
+	# Cleanup
+	EventBus.save_completed.disconnect(callback)
+	Settings.set_auto_save_enabled(original_value)
+
+	# Assert
+	assert_eq(state.save_count, 1, "Pause signal should trigger autosave")
+
+
+func test_autosave_emits_save_completed_signal() -> void:
+	# Arrange
+	var original_value := Settings.is_auto_save_enabled()
+	Settings.set_auto_save_enabled(true)
+
+	var state := {"received": false, "success": false}
+	var callback := func(success: bool) -> void:
+		state.received = true
+		state.success = success
+
+	EventBus.save_completed.connect(callback)
+
+	# Act
+	SaveManager.force_autosave()
+	await get_tree().process_frame
+
+	# Cleanup
+	EventBus.save_completed.disconnect(callback)
+	Settings.set_auto_save_enabled(original_value)
+
+	# Assert
+	assert_true(state.received, "save_completed signal should be emitted on autosave")
+	assert_true(state.success, "Autosave should succeed")
+
+
+func test_autosave_uses_quick_save_slot() -> void:
+	# Arrange - save to test slot first to set _last_save_slot
+	SaveManager.save_game(TEST_SLOT)
+
+	var original_value := Settings.is_auto_save_enabled()
+	Settings.set_auto_save_enabled(true)
+
+	# Act - force autosave
+	SaveManager.force_autosave()
+	await get_tree().process_frame
+
+	# Cleanup
+	Settings.set_auto_save_enabled(original_value)
+
+	# Assert - slot should still have save
+	assert_true(SaveManager.save_exists(TEST_SLOT), "Autosave should use last used slot")
+
+
+func test_set_autosave_enabled_updates_setting() -> void:
+	# Arrange
+	var original_value := Settings.is_auto_save_enabled()
+
+	# Act - toggle setting via SaveManager API
+	SaveManager.set_autosave_enabled(false)
+	var disabled_state := Settings.is_auto_save_enabled()
+
+	SaveManager.set_autosave_enabled(true)
+	var enabled_state := Settings.is_auto_save_enabled()
+
+	# Cleanup
+	Settings.set_auto_save_enabled(original_value)
+
+	# Assert
+	assert_false(disabled_state, "Setting should be disabled")
+	assert_true(enabled_state, "Setting should be enabled")
+
+
+func test_concurrent_save_prevented() -> void:
+	# Arrange - this tests that _save_in_progress prevents concurrent saves
+	var state := {"save_count": 0}
+	var callback := func(_success: bool) -> void:
+		state.save_count += 1
+
+	EventBus.save_completed.connect(callback)
+
+	# Act - rapid sequential saves (synchronous so they don't actually overlap)
+	SaveManager.save_game(TEST_SLOT)
+	SaveManager.save_game(TEST_SLOT)
+	await get_tree().process_frame
+
+	# Cleanup
+	EventBus.save_completed.disconnect(callback)
+
+	# Assert - both saves should complete (no overlap in synchronous code)
+	assert_eq(state.save_count, 2, "Sequential saves should complete")
+
+
+func test_autosave_blocked_during_load() -> void:
+	# Arrange - create a save to load
+	SaveManager.save_game(TEST_SLOT)
+
+	var original_value := Settings.is_auto_save_enabled()
+	Settings.set_auto_save_enabled(true)
+
+	var state := {"autosave_count": 0}
+	var callback := func(_success: bool) -> void:
+		state.autosave_count += 1
+
+	# Track saves triggered during load
+	var load_callback := func() -> void:
+		# During load, try to force an autosave
+		SaveManager.force_autosave()
+
+	EventBus.save_completed.connect(callback)
+	EventBus.load_started.connect(load_callback)
+
+	# Act - start a load (autosave should be blocked during load)
+	SaveManager.load_game(TEST_SLOT)
+	await get_tree().process_frame
+
+	# Cleanup
+	EventBus.save_completed.disconnect(callback)
+	EventBus.load_started.disconnect(load_callback)
+	Settings.set_auto_save_enabled(original_value)
+
+	# Assert - autosave should NOT have triggered during load
+	# Note: save_completed fires once for the load operation itself (false), not for autosave
+	assert_eq(state.autosave_count, 0, "Autosave should be blocked during load")

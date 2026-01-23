@@ -726,8 +726,14 @@ func _start_autosave_if_enabled() -> void:
 
 
 ## Perform an autosave.
+## Skips if auto-save disabled, load in progress, or save already in progress.
 func _perform_autosave() -> void:
 	if not Settings.is_auto_save_enabled():
+		return
+
+	# Don't auto-save during load to prevent data corruption (Story 6-2: AC3)
+	if _load_in_progress:
+		GameLogger.debug("SaveManager", "Autosave skipped: load in progress")
 		return
 
 	GameLogger.debug("SaveManager", "Autosave triggered")
