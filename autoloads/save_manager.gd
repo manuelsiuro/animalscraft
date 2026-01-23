@@ -439,14 +439,19 @@ func _gather_resources_data() -> Dictionary:
 	return {"resources": {}}
 
 
-## Gather progression data.
+## Gather progression data including milestones.
 func _gather_progression_data() -> Dictionary:
-	# TODO: Implement when progression systems exist (Epic 6)
-	return {
-		"milestones": [],
-		"unlocks": [],
+	var progression_data := {
 		"current_biome": "plains",
 	}
+
+	# Get milestone data from MilestoneManager (Story 6-5)
+	if is_instance_valid(MilestoneManager):
+		progression_data["milestones"] = MilestoneManager.get_save_data()
+	else:
+		progression_data["milestones"] = {}
+
+	return progression_data
 
 
 ## Get total playtime in seconds.
@@ -567,10 +572,14 @@ func _apply_animals_data(data: Array) -> void:
 	GameLogger.debug("SaveManager", "Animals restoration: %d animals (stub)" % data.size())
 
 
-## Apply progression data.
+## Apply progression data including milestones.
 func _apply_progression_data(data: Dictionary) -> void:
-	# TODO: Implement when progression systems exist
-	GameLogger.debug("SaveManager", "Progression restoration (stub)")
+	# Load milestone data (Story 6-5)
+	if is_instance_valid(MilestoneManager) and data.has("milestones"):
+		MilestoneManager.load_save_data(data["milestones"])
+		GameLogger.debug("SaveManager", "Milestones restored")
+	else:
+		GameLogger.debug("SaveManager", "No milestone data to restore")
 
 
 ## Migrate save data from older versions.

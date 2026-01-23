@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MilestoneData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/progression/milestone_data.gd" id="1_milestone"]
+
+[resource]
+script = ExtResource("1_milestone")
+id = "wins_10"
+display_name = "Veteran Commander"
+description = "Win 10 combats"
+type = 3
+threshold = 10
+trigger_value = ""
+unlock_rewards = []

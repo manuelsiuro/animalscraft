@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MilestoneData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/progression/milestone_data.gd" id="1_milestone"]
+
+[resource]
+script = ExtResource("1_milestone")
+id = "territory_25"
+display_name = "Territory Expander"
+description = "Claim 25 hexes of territory"
+type = 2
+threshold = 25
+trigger_value = ""
+unlock_rewards = []

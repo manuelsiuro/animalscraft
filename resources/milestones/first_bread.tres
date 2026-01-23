@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MilestoneData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/progression/milestone_data.gd" id="1_milestone"]
+
+[resource]
+script = ExtResource("1_milestone")
+id = "first_bread"
+display_name = "Master Baker"
+description = "Produce your first Bread"
+type = 4
+threshold = 1
+trigger_value = "bread"
+unlock_rewards = []
