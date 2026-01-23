@@ -409,8 +409,8 @@ func test_working_state_mood_penalty_timer_resets_when_energy_restored() -> void
 # =============================================================================
 
 func test_resting_state_energy_recovery_rate_constant() -> void:
-	## AC4: Verify ENERGY_RECOVERY_RATE constant (~3s per point)
-	assert_almost_eq(RestingState.ENERGY_RECOVERY_RATE, 0.33, 0.01, "ENERGY_RECOVERY_RATE should be ~0.33")
+	## AC4: Verify BASE_ENERGY_RECOVERY_RATE constant (~3s per point)
+	assert_almost_eq(RestingState.BASE_ENERGY_RECOVERY_RATE, 0.33, 0.01, "BASE_ENERGY_RECOVERY_RATE should be ~0.33")
 
 
 func test_resting_state_restores_energy_over_time() -> void:

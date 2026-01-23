@@ -159,6 +159,22 @@ const DEFAULT_SFX_VOLUME: float = 1.0
 const MUSIC_FADE_DURATION: float = 1.0
 
 # =============================================================================
+# GROUP NAMES (Story 5-11)
+# =============================================================================
+
+## Group name for shelter buildings (used for efficient lookup)
+const GROUP_SHELTERS: String = "shelters"
+
+## Group name for all buildings
+const GROUP_BUILDINGS: String = "buildings"
+
+## Group name for all animals
+const GROUP_ANIMALS: String = "animals"
+
+## Group name for systems
+const GROUP_SYSTEMS: String = "systems"
+
+# =============================================================================
 # DEBUG CONSTANTS (Development Only)
 # =============================================================================
 

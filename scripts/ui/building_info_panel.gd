@@ -54,6 +54,10 @@ const STATUS_PAUSED := "Paused (Storage Full)"
 ## PROCESSOR-specific status strings (Story 4-5)
 const STATUS_WAITING := "Waiting for Inputs"
 const STATUS_PRODUCING := "Producing %s"
+## SHELTER-specific status strings (Story 5-11)
+const STATUS_SHELTER_EMPTY := "Ready for Animals"
+const STATUS_SHELTER_PARTIAL := "%d/%d Resting"
+const STATUS_SHELTER_FULL := "Full (%d/%d)"
 
 ## Storage display color constants (Story 4-6)
 const COLOR_STORAGE_NORMAL := Color(1, 0.95, 0.9, 1)  # Light/white
@@ -109,6 +113,9 @@ func _ready() -> void:
 		# PROCESSOR-specific signals for real-time input availability updates (Story 4-5)
 		EventBus.resource_changed.connect(_on_resource_changed)
 		EventBus.production_completed.connect(_on_production_completed_for_display)
+		# SHELTER-specific signals for occupancy updates (Story 5-11)
+		EventBus.animal_entered_shelter.connect(_on_shelter_occupancy_changed)
+		EventBus.animal_left_shelter.connect(_on_shelter_occupancy_changed)
 
 	# Connect assign worker button (Story 3-10)
 	if _assign_worker_button:
@@ -169,6 +176,11 @@ func _exit_tree() -> void:
 			EventBus.resource_changed.disconnect(_on_resource_changed)
 		if EventBus.production_completed.is_connected(_on_production_completed_for_display):
 			EventBus.production_completed.disconnect(_on_production_completed_for_display)
+		# Disconnect SHELTER-specific signals (Story 5-11)
+		if EventBus.animal_entered_shelter.is_connected(_on_shelter_occupancy_changed):
+			EventBus.animal_entered_shelter.disconnect(_on_shelter_occupancy_changed)
+		if EventBus.animal_left_shelter.is_connected(_on_shelter_occupancy_changed):
+			EventBus.animal_left_shelter.disconnect(_on_shelter_occupancy_changed)
 
 # =============================================================================
 # PUBLIC API
@@ -367,6 +379,13 @@ func _on_production_completed_for_display(building: Node, _output_type: String) 
 	if is_instance_valid(_current_building) and building == _current_building:
 		_update_display()
 
+
+## Handle shelter occupancy changes (Story 5-11)
+func _on_shelter_occupancy_changed(_animal: Node, shelter: Node) -> void:
+	# Only update if it's the currently displayed building
+	if is_instance_valid(_current_building) and shelter == _current_building:
+		_update_display()
+
 # =============================================================================
 # PRIVATE METHODS
 # =============================================================================
@@ -415,14 +434,16 @@ func _update_display() -> void:
 	# Worker slots
 	_update_workers_display(data)
 
-	# Production section (for gatherers)
+	# Production section (for gatherers) OR shelter status (Story 5-11)
 	_update_production_display(data)
 
 	# Worker section with assign button (Story 3-10)
+	# NOTE: For shelters, workers_label doubles as capacity display (Story 5-11)
 	_update_worker_section(data)
 
 
 ## Update worker count display
+## For SHELTER buildings, shows "Resting: X/Y" instead of "Workers: X/Y" (Story 5-11)
 func _update_workers_display(data: BuildingData) -> void:
 	if not _workers_label:
 		return
@@ -431,14 +452,28 @@ func _update_workers_display(data: BuildingData) -> void:
 	if slots:
 		var current_workers := slots.get_worker_count()
 		var max_workers := data.max_workers
-		_workers_label.text = "Workers: %d/%d" % [current_workers, max_workers]
+
+		# SHELTER buildings show "Resting" instead of "Workers" (Story 5-11, AC 19)
+		if data.building_type == BuildingTypes.BuildingType.SHELTER:
+			_workers_label.text = "Resting: %d/%d" % [current_workers, max_workers]
+		else:
+			_workers_label.text = "Workers: %d/%d" % [current_workers, max_workers]
 	else:
-		_workers_label.text = "Workers: 0/%d" % data.max_workers
+		if data.building_type == BuildingTypes.BuildingType.SHELTER:
+			_workers_label.text = "Resting: 0/%d" % data.max_workers
+		else:
+			_workers_label.text = "Workers: 0/%d" % data.max_workers
 
 
-## Update production status display (for gatherer AND processor buildings - Story 4-5)
+## Update production status display (for gatherer, processor, AND shelter buildings)
+## Story 5-11: Shelters show recovery status instead of production
 func _update_production_display(data: BuildingData) -> void:
 	if not _production_section:
+		return
+
+	# SHELTER buildings show simplified status (Story 5-11)
+	if data.building_type == BuildingTypes.BuildingType.SHELTER:
+		_update_shelter_display(data)
 		return
 
 	# Show production section for BOTH gatherer AND processor buildings (AC11)
@@ -454,6 +489,52 @@ func _update_production_display(data: BuildingData) -> void:
 		_update_processor_display(data)
 	else:
 		_update_gatherer_display(data)
+
+
+## Update display for SHELTER buildings (Story 5-11)
+func _update_shelter_display(data: BuildingData) -> void:
+	# Hide PROCESSOR-specific UI
+	_hide_processor_ui()
+
+	# Show production section for status display
+	_production_section.visible = true
+
+	# Get shelter component for status
+	var shelter_comp: Node = null
+	if _current_building.has_method("get_shelter"):
+		shelter_comp = _current_building.get_shelter()
+
+	# Output label - show recovery bonus info
+	if _output_label:
+		_output_label.text = "2x Recovery"
+
+	# Cycle time - show recovery rate
+	if _cycle_label:
+		_cycle_label.text = "0.66 E/s"
+
+	# Production status - show occupancy status (AC 18, 19)
+	if _status_label:
+		_status_label.text = _get_shelter_status_text(shelter_comp, data)
+
+
+## Get status text for SHELTER buildings (AC 18, 19)
+func _get_shelter_status_text(shelter_comp: Node, data: BuildingData) -> String:
+	var occupancy := 0
+	var max_capacity := data.max_workers
+
+	if shelter_comp and shelter_comp.has_method("get_occupancy"):
+		occupancy = shelter_comp.get_occupancy()
+	elif is_instance_valid(_current_building):
+		var slots := _current_building.get_worker_slots()
+		if slots:
+			occupancy = slots.get_worker_count()
+
+	if occupancy == 0:
+		return STATUS_SHELTER_EMPTY
+	elif occupancy >= max_capacity:
+		return STATUS_SHELTER_FULL % [occupancy, max_capacity]
+	else:
+		return STATUS_SHELTER_PARTIAL % [occupancy, max_capacity]
 
 
 ## Update display for GATHERER buildings (Farm, Sawmill)
@@ -797,8 +878,19 @@ func _find_worker_selection_overlay() -> void:
 
 ## Update worker section visibility and button state (AC1, AC2, AC11)
 ## Updated Story 4-5: Show worker section for BOTH gatherer AND processor buildings
+## Updated Story 5-11: Show worker section for SHELTER buildings (animals inside)
 func _update_worker_section(data: BuildingData) -> void:
 	if not _worker_section:
+		return
+
+	# SHELTER buildings show occupants without assign button (Story 5-11)
+	if data.building_type == BuildingTypes.BuildingType.SHELTER:
+		_worker_section.visible = true
+		# Hide assign button for shelters - animals auto-seek (AC 8)
+		if _assign_worker_button:
+			_assign_worker_button.visible = false
+		# Still show worker icons (resting animals)
+		_update_worker_icons()
 		return
 
 	# Show worker section for gatherer AND processor buildings (Story 4-5)
@@ -807,6 +899,8 @@ func _update_worker_section(data: BuildingData) -> void:
 		return
 
 	_worker_section.visible = true
+	if _assign_worker_button:
+		_assign_worker_button.visible = true
 
 	# Update assign worker button state (AC1, AC2)
 	_update_assign_button_state()

@@ -35,6 +35,10 @@ var _initialized: bool = false
 ## Used for worker assignment tracking and cleanup.
 var _current_building: Node = null
 
+## Target building this animal is walking towards (Story 5-11).
+## Used by ShelterSeekingSystem for routing and by RestingState for recovery bonus.
+var _target_building: Node = null
+
 ## Whether this animal is wild (Story 5-2).
 ## Wild animals belong to enemy herds and display visual distinction.
 var is_wild: bool = false
@@ -236,6 +240,30 @@ func has_assigned_building() -> bool:
 	return is_instance_valid(_current_building)
 
 
+## Set the target building this animal is moving towards (Story 5-11).
+## Used by ShelterSeekingSystem for shelter routing.
+## @param building The Building node this animal is walking to (or null to clear)
+func set_target_building(building: Node) -> void:
+	_target_building = building
+	if building:
+		var building_id: String = building.get_building_id() if building.has_method("get_building_id") else "unknown"
+		GameLogger.debug("Animal", "%s: Target set to %s" % [get_animal_id(), building_id])
+	else:
+		GameLogger.debug("Animal", "%s: Target building cleared" % get_animal_id())
+
+
+## Get the target building this animal is walking towards (Story 5-11).
+## @return The Building node or null if no target
+func get_target_building() -> Node:
+	return _target_building
+
+
+## Check if this animal has a target building (Story 5-11).
+## @return true if animal is walking towards a building
+func has_target_building() -> bool:
+	return is_instance_valid(_target_building)
+
+
 ## Set whether this animal displays wild indicator (Story 5-2).
 ## Wild animals have a subtle red tint to distinguish from player-owned animals.
 ## @param enabled True to show wild indicator, false to hide it
@@ -299,6 +327,7 @@ func cleanup() -> void:
 	hex_coord = null
 	stats = null
 	_current_building = null
+	_target_building = null
 
 	# 5. Remove from groups
 	remove_from_group("animals")

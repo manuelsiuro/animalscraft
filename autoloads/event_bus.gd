@@ -448,3 +448,29 @@ signal autoloads_ready()
 ## Emitted when autoload verification fails.
 ## @param missing_autoloads Array of autoload names that are missing
 signal autoloads_failed(missing_autoloads: Array)
+
+# =============================================================================
+# SHELTER EVENTS (Story 5-11)
+# =============================================================================
+
+## Story 5-11: Emitted when an animal enters a Shelter building for recovery.
+## Fired when animal is added to shelter's resting animals list.
+## @param animal The Animal node that entered the shelter
+## @param shelter The Building node (shelter) that was entered
+signal animal_entered_shelter(animal: Node, shelter: Node)
+
+## Story 5-11: Emitted when an animal leaves a Shelter building after recovery.
+## Fired when animal is removed from shelter's resting animals list.
+## @param animal The Animal node that left the shelter
+## @param shelter The Building node (shelter) that was left
+signal animal_left_shelter(animal: Node, shelter: Node)
+
+## Story 5-11: Emitted when a Shelter reaches maximum capacity (4 animals).
+## Fired when the 4th animal enters the shelter.
+## @param shelter The Building node (shelter) that reached capacity
+signal shelter_capacity_reached(shelter: Node)
+
+## Story 5-11: Emitted when a Shelter has capacity available after being full.
+## Fired when an animal leaves a previously full shelter (4→3).
+## @param shelter The Building node (shelter) that now has capacity
+signal shelter_capacity_available(shelter: Node)

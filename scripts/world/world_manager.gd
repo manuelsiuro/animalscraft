@@ -43,6 +43,9 @@ var _wild_herd_manager: WildHerdManager
 ## Combat manager (Story 5.5 - for auto-battle system)
 var _combat_manager: CombatManager
 
+## Shelter seeking system (Story 5-11 - for tired animals to find shelters)
+var _shelter_seeking_system: ShelterSeekingSystem
+
 # =============================================================================
 # SIGNALS
 # =============================================================================
@@ -100,6 +103,12 @@ func _ready() -> void:
 	_combat_manager.name = "CombatManager"
 	add_child(_combat_manager)
 	_combat_manager.initialize(self)
+
+	# Create shelter seeking system (Story 5-11)
+	_shelter_seeking_system = ShelterSeekingSystem.new()
+	_shelter_seeking_system.name = "ShelterSeekingSystem"
+	add_child(_shelter_seeking_system)
+	# Note: ShelterSeekingSystem self-initializes in _ready() via EventBus connections
 
 
 # =============================================================================
@@ -279,6 +288,13 @@ func get_wild_herd_manager() -> WildHerdManager:
 ## @return The CombatManager instance
 func get_combat_manager() -> CombatManager:
 	return _combat_manager
+
+
+## Get the shelter seeking system (Story 5-11).
+##
+## @return The ShelterSeekingSystem instance
+func get_shelter_seeking_system() -> ShelterSeekingSystem:
+	return _shelter_seeking_system
 
 
 ## Get the player's spawn hex for recruited animals (Story 5-8).

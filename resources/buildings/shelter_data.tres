@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=2 format=3 uid="uid://nqmjnbc2h35e"]
+
+[ext_resource type="Script" path="res://scripts/entities/buildings/building_data.gd" id="1_shelter"]
+
+[resource]
+script = ExtResource("1_shelter")
+building_id = "shelter"
+display_name = "Shelter"
+building_type = 3
+max_workers = 4
+footprint_hexes = Array[Vector2i]([Vector2i(0, 0)])
+production_recipe_id = ""
+output_resource_id = ""
+production_time = 0.0
+terrain_requirements = Array[int]([0])
+build_cost = {
+"wood": 15
+}

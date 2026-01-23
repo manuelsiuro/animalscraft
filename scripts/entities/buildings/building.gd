@@ -49,6 +49,10 @@ var _gatherer: Node = null
 ## Note: Using Node type to avoid load order issues with class_name
 var _processor: Node = null
 
+## ShelterComponent for animal rest recovery - optional, only for SHELTER buildings (Story 5-11)
+## Note: Using Node type to avoid load order issues with class_name
+var _shelter: Node = null
+
 # =============================================================================
 # SELECTION VISUAL (same pattern as Animal)
 # =============================================================================
@@ -99,6 +103,14 @@ func initialize(hex: HexCoord, building_data: BuildingData) -> void:
 		_processor = get_node_or_null("ProcessorComponent")
 		if _processor and _processor.has_method("initialize"):
 			_processor.initialize(self, building_data.production_recipe_id)
+
+	# Initialize ShelterComponent for SHELTER buildings (Story 5-11)
+	if building_data and building_data.building_type == BuildingTypes.BuildingType.SHELTER:
+		_shelter = get_node_or_null("ShelterComponent")
+		if _shelter and _shelter.has_method("initialize"):
+			_shelter.initialize(self)
+		# Add to "shelters" group for efficient lookup (Party Mode performance feedback)
+		add_to_group(GameConstants.GROUP_SHELTERS)
 
 	# Mark hex as occupied
 	_mark_hex_occupied()
@@ -196,6 +208,7 @@ func _on_selection_changed(is_selected_state: bool) -> void:
 
 ## Handle worker_added signal from WorkerSlotComponent (Story 3-8)
 ## Starts production for the worker on GathererComponent or ProcessorComponent if available.
+## For shelters, adds animal to ShelterComponent for recovery tracking (Story 5-11).
 func _on_worker_added(animal: Animal) -> void:
 	var animal_id := animal.get_animal_id() if animal.has_method("get_animal_id") else "unknown"
 	GameLogger.debug("Building", "Worker assigned: %s" % animal_id)
@@ -220,9 +233,14 @@ func _on_worker_added(animal: Animal) -> void:
 			EventBus.production_started.emit(self)
 			GameLogger.info("Building", "Production started at %s" % get_building_id())
 
+	# Add animal to ShelterComponent for recovery tracking (Story 5-11)
+	if _shelter and _shelter.is_initialized():
+		_shelter.add_resting_animal(animal)
+
 
 ## Handle worker_removed signal from WorkerSlotComponent (Story 3-8)
 ## Stops production for the worker on GathererComponent or ProcessorComponent if available.
+## For shelters, removes animal from ShelterComponent (Story 5-11).
 func _on_worker_removed(animal: Animal) -> void:
 	var animal_id := animal.get_animal_id() if animal and animal.has_method("get_animal_id") else "unknown"
 	GameLogger.debug("Building", "Worker unassigned: %s" % animal_id)
@@ -246,6 +264,10 @@ func _on_worker_removed(animal: Animal) -> void:
 			_production_active = false
 			EventBus.production_halted.emit(self, "no_workers")
 			GameLogger.info("Building", "Production halted at %s - no workers" % get_building_id())
+
+	# Remove animal from ShelterComponent (Story 5-11)
+	if _shelter and _shelter.is_initialized():
+		_shelter.remove_resting_animal(animal)
 
 # =============================================================================
 # HEX OCCUPANCY
@@ -354,6 +376,18 @@ func is_processor() -> bool:
 func is_production_active() -> bool:
 	return _production_active
 
+
+## Get the shelter component for external access (Story 5-11).
+## @return ShelterComponent (as Node) or null if not a shelter building
+func get_shelter() -> Node:
+	return _shelter
+
+
+## Check if this building is a shelter (provides rest recovery bonus) (Story 5-11).
+## @return true if this building has a ShelterComponent
+func is_shelter() -> bool:
+	return _shelter != null and _shelter.is_initialized()
+
 # =============================================================================
 # CLEANUP
 # =============================================================================
@@ -391,6 +425,14 @@ func cleanup() -> void:
 	if _processor:
 		_processor.cleanup()
 		_processor = null
+
+	# 4c. Clean up ShelterComponent (Story 5-11, AC: 23)
+	# Notifies resting animals to continue resting outdoors
+	if _shelter:
+		_shelter.cleanup()
+		_shelter = null
+		# Remove from shelters group
+		remove_from_group(GameConstants.GROUP_SHELTERS)
 
 	# 5. Unmark hex occupancy
 	_unmark_hex_occupied()
