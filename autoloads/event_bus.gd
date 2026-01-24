@@ -367,6 +367,12 @@ signal animal_movement_completed(animal: Node)
 ## @param animal The Animal node whose movement was cancelled
 signal animal_movement_cancelled(animal: Node)
 
+## Story 6-9: Emitted when an animal is assigned as a worker to a building.
+## Used by tutorial system to track worker assignment progression.
+## @param animal The Animal node being assigned
+## @param building The Building node that the animal is assigned to
+signal worker_assigned(animal: Node, building: Node)
+
 # =============================================================================
 # BUILDING EVENTS
 # =============================================================================
@@ -424,6 +430,16 @@ signal tutorial_hint_requested(hint_id: String)
 ## Emitted when the player dismisses a tutorial hint.
 ## @param hint_id The ID of the dismissed hint
 signal tutorial_hint_dismissed(hint_id: String)
+
+## Story 6-9: Emitted when tutorial sequence starts.
+signal tutorial_started()
+
+## Story 6-9: Emitted when a tutorial step is completed.
+## @param step_id The TutorialStep enum value that was completed
+signal tutorial_step_completed(step_id: int)
+
+## Story 6-9: Emitted when all tutorials are complete.
+signal tutorial_completed()
 
 # =============================================================================
 # SETTINGS EVENTS

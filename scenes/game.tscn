@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://bi7e17bdmd70e"]
+[gd_scene load_steps=14 format=3 uid="uid://bi7e17bdmd70e"]
 
 [ext_resource type="Script" uid="uid://8oy57wwaggvh" path="res://scripts/game.gd" id="1"]
 [ext_resource type="Script" uid="uid://b30xd54sjhbdr" path="res://scripts/world/world_manager.gd" id="2_lnu2h"]
@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" uid="uid://combat_team_selection_modal" path="res://scenes/ui/gameplay/combat_team_selection_modal.tscn" id="11_combat_team_selection_modal"]
 [ext_resource type="PackedScene" uid="uid://combat_overlay" path="res://scenes/ui/gameplay/combat_overlay.tscn" id="12_combat_overlay"]
 [ext_resource type="Script" path="res://scripts/ui/gameplay/milestone_celebration_manager.gd" id="13_milestone_celebration_manager"]
+[ext_resource type="PackedScene" uid="uid://d2k9tutorial001" path="res://scenes/ui/tutorial_tooltip.tscn" id="14_tutorial_tooltip"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -46,6 +47,8 @@ script = ExtResource("2_lnu2h")
 [node name="CombatTeamSelectionModal" parent="UI" instance=ExtResource("11_combat_team_selection_modal")]
 
 [node name="CombatOverlay" parent="UI" instance=ExtResource("12_combat_overlay")]
+
+[node name="TutorialTooltip" parent="UI" instance=ExtResource("14_tutorial_tooltip")]
 
 [node name="MilestoneCelebrationManager" type="CanvasLayer" parent="."]
 layer = 90

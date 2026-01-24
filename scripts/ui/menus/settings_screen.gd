@@ -41,6 +41,7 @@ const COLORBLIND_LABELS := ["None", "Deuteranopia", "Protanopia", "Tritanopia"]
 @onready var _vibration_toggle: CheckButton = $VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection/VibrationToggle
 @onready var _touch_sensitivity_slider: HSlider = $VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection/TouchSensitivity/HSlider
 @onready var _touch_sensitivity_label: Label = $VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection/TouchSensitivity/ValueLabel
+@onready var _reset_tutorial_button: Button = $VBoxContainer/ScrollContainer/SettingsContainer/GameplaySection/ResetTutorialButton
 
 # Accessibility Section
 @onready var _colorblind_dropdown: OptionButton = $VBoxContainer/ScrollContainer/SettingsContainer/AccessibilitySection/ColorblindMode/OptionButton
@@ -50,6 +51,7 @@ const COLORBLIND_LABELS := ["None", "Deuteranopia", "Protanopia", "Tritanopia"]
 # Footer
 @onready var _reset_button: Button = $VBoxContainer/Footer/ResetButton
 @onready var _reset_dialog: ConfirmationDialog = $ResetConfirmDialog
+@onready var _tutorial_reset_dialog: ConfirmationDialog = $TutorialResetDialog
 
 # =============================================================================
 # STATE
@@ -131,6 +133,12 @@ func _connect_signals() -> void:
 	if _reset_dialog:
 		_reset_dialog.confirmed.connect(_on_reset_confirmed)
 
+	# Tutorial Reset (Story 6-9)
+	if _reset_tutorial_button:
+		_reset_tutorial_button.pressed.connect(_on_reset_tutorial_pressed)
+	if _tutorial_reset_dialog:
+		_tutorial_reset_dialog.confirmed.connect(_on_tutorial_reset_confirmed)
+
 
 func _disconnect_signals() -> void:
 	if _back_button and _back_button.pressed.is_connected(_on_back_pressed):
@@ -157,6 +165,10 @@ func _disconnect_signals() -> void:
 		_reset_button.pressed.disconnect(_on_reset_pressed)
 	if _reset_dialog and _reset_dialog.confirmed.is_connected(_on_reset_confirmed):
 		_reset_dialog.confirmed.disconnect(_on_reset_confirmed)
+	if _reset_tutorial_button and _reset_tutorial_button.pressed.is_connected(_on_reset_tutorial_pressed):
+		_reset_tutorial_button.pressed.disconnect(_on_reset_tutorial_pressed)
+	if _tutorial_reset_dialog and _tutorial_reset_dialog.confirmed.is_connected(_on_tutorial_reset_confirmed):
+		_tutorial_reset_dialog.confirmed.disconnect(_on_tutorial_reset_confirmed)
 
 # =============================================================================
 # SETUP
@@ -331,6 +343,24 @@ func _on_reset_confirmed() -> void:
 	Settings.reset_to_defaults()
 	_refresh_all_controls()
 	GameLogger.info("SettingsScreen", "Settings reset to defaults")
+
+# =============================================================================
+# TUTORIAL RESET HANDLERS (Story 6-9, AC14)
+# =============================================================================
+
+func _on_reset_tutorial_pressed() -> void:
+	if not _tutorial_reset_dialog:
+		return
+	_tutorial_reset_dialog.popup_centered()
+	GameLogger.debug("SettingsScreen", "Tutorial reset confirmation shown")
+
+
+func _on_tutorial_reset_confirmed() -> void:
+	if is_instance_valid(TutorialManager):
+		TutorialManager.reset_all()
+		GameLogger.info("SettingsScreen", "Tutorial progress reset")
+	else:
+		GameLogger.warn("SettingsScreen", "TutorialManager not available for reset")
 
 # =============================================================================
 # PUBLIC API

@@ -164,15 +164,21 @@ func _process(delta: float) -> void:
 		set_process(false)  # Stop processing after transition
 
 
-## Request transition to game scene via GameManager.
-## This is a convenience method for UI elements.
+## Request transition to appropriate scene based on first launch detection.
+## First launch: Start game directly with tutorial (AC2 - Story 6-9)
+## Subsequent launches: Go to main menu for load/continue options
 func go_to_game() -> void:
 	# AR18: Null safety guard
 	if not is_instance_valid(GameManager):
-		push_error("[Main] Cannot transition to game - GameManager not available")
+		push_error("[Main] Cannot transition - GameManager not available")
 		return
 
-	if is_instance_valid(GameLogger):
-		GameLogger.info("Main", "Transitioning from splash screen to game scene")
-
-	GameManager.change_to_game_scene()
+	# Story 6-9 AC2: First launch detection
+	if GameManager.is_first_launch():
+		if is_instance_valid(GameLogger):
+			GameLogger.info("Main", "First launch detected - starting tutorial game directly")
+		GameManager.start_first_launch_game()
+	else:
+		if is_instance_valid(GameLogger):
+			GameLogger.info("Main", "Returning player - transitioning to main menu")
+		GameManager.change_to_main_scene()

@@ -463,6 +463,12 @@ func _gather_progression_data() -> Dictionary:
 	else:
 		progression_data["upgrade_bonuses"] = {}
 
+	# Get tutorial data from TutorialManager (Story 6-9)
+	if is_instance_valid(TutorialManager):
+		progression_data["tutorial"] = TutorialManager.get_save_data()
+	else:
+		progression_data["tutorial"] = {}
+
 	return progression_data
 
 
@@ -606,6 +612,13 @@ func _apply_progression_data(data: Dictionary) -> void:
 		GameLogger.debug("SaveManager", "Upgrade bonuses restored")
 	else:
 		GameLogger.debug("SaveManager", "No upgrade bonus data to restore")
+
+	# Load tutorial data (Story 6-9)
+	if is_instance_valid(TutorialManager) and data.has("tutorial"):
+		TutorialManager.load_save_data(data["tutorial"])
+		GameLogger.debug("SaveManager", "Tutorial state restored")
+	else:
+		GameLogger.debug("SaveManager", "No tutorial data to restore")
 
 
 ## Migrate save data from older versions.

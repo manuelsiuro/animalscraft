@@ -35,6 +35,7 @@ RecipeManager="*res://autoloads/recipe_manager.gd"
 MilestoneManager="*res://autoloads/milestone_manager.gd"
 BuildingUnlockManager="*res://autoloads/building_unlock_manager.gd"
 UpgradeBonusManager="*res://autoloads/upgrade_bonus_manager.gd"
+TutorialManager="*res://autoloads/tutorial_manager.gd"
 
 [display]
 

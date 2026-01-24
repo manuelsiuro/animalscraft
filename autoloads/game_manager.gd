@@ -8,6 +8,7 @@
 ## Controls game state, pause, time scale, and coordinates other systems.
 ## Story 0.5: Added scene transition methods (change_to_game_scene, change_to_main_scene)
 ## Story 1.7: Added auto-pause on app switch with Android support (PAUSED/RESUMED notifications)
+## Story 6-9: Added first launch detection for tutorial flow
 ## NOTE: No class_name to avoid conflict with autoload singleton
 extends Node
 
@@ -136,6 +137,36 @@ func is_in_menu() -> bool:
 ## Check if game is loading.
 func is_loading() -> bool:
 	return _state == GameState.LOADING
+
+
+# =============================================================================
+# FIRST LAUNCH DETECTION (Story 6-9)
+# =============================================================================
+
+## Check if this is the first launch (no save file exists).
+## Used to determine if tutorial should be shown and to skip main menu.
+func is_first_launch() -> bool:
+	if not is_instance_valid(SaveManager):
+		return true
+	var saves := SaveManager.get_all_save_info()
+	return saves.is_empty()
+
+
+## Start the game directly (skip main menu) for first-time players.
+## Enables tutorial and starts a new game immediately.
+func start_first_launch_game() -> void:
+	GameLogger.info("GameManager", "First launch detected - starting tutorial game")
+
+	# Ensure tutorial is enabled
+	if is_instance_valid(TutorialManager):
+		TutorialManager.set_tutorial_enabled(true)
+
+	# Emit tutorial started signal
+	if is_instance_valid(EventBus):
+		EventBus.tutorial_started.emit()
+
+	# Start new game directly
+	start_new_game()
 
 
 # =============================================================================
