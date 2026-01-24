@@ -244,3 +244,50 @@ static func get_animal_display_name(animal_type: String) -> String:
 			if animal_type.is_empty():
 				return "Unknown"
 			return animal_type.capitalize()
+
+
+## Get emoji icon for building type (used in milestone UI and other displays).
+## Story 6-6: Added for milestone celebration unlock rewards display.
+## @param building_type The building type string (e.g., "farm", "mill")
+## @return The emoji icon for the building type, or default building icon
+static func get_building_icon(building_type: String) -> String:
+	match building_type:
+		"farm":
+			return "\ud83c\udf3e"  # 🌾
+		"sawmill":
+			return "\ud83e\udeb5"  # 🪵
+		"mill":
+			return "\ud83c\udf7d\ufe0f"  # 🍽️ (representing grain processing)
+		"bakery":
+			return "\ud83c\udf5e"  # 🍞
+		"shelter":
+			return "\ud83c\udfe0"  # 🏠
+		"stockpile":
+			return "\ud83d\udce6"  # 📦
+		_:
+			return "\ud83c\udfd7\ufe0f"  # 🏗️
+
+
+## Get display name for building type (used in UI displays).
+## Story 6-6: Added for milestone celebration unlock rewards display.
+## @param building_type The building type string (e.g., "farm", "mill")
+## @return The display name for the building type (Title Case)
+static func get_building_display_name(building_type: String) -> String:
+	match building_type:
+		"farm":
+			return "Farm"
+		"sawmill":
+			return "Sawmill"
+		"mill":
+			return "Mill"
+		"bakery":
+			return "Bakery"
+		"shelter":
+			return "Shelter"
+		"stockpile":
+			return "Stockpile"
+		_:
+			# Capitalize first letter as fallback
+			if building_type.is_empty():
+				return "Building"
+			return building_type.capitalize()
