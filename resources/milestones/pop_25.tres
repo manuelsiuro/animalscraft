@@ -4,10 +4,10 @@
 
 [resource]
 script = ExtResource("1_milestone")
-id = "pop_30"
-display_name = "Growing Town"
-description = "Reach 30 animals in your village"
+id = "pop_25"
+display_name = "Growing Village"
+description = "Reach 25 animals in your village"
 type = 0
-threshold = 30
+threshold = 25
 trigger_value = ""
-unlock_rewards = ["warehouse"]
+unlock_rewards = ["hospital"]

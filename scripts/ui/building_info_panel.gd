@@ -465,8 +465,9 @@ func _update_workers_display(data: BuildingData) -> void:
 			_workers_label.text = "Workers: 0/%d" % data.max_workers
 
 
-## Update production status display (for gatherer, processor, AND shelter buildings)
+## Update production status display (for gatherer, processor, shelter, AND upgrade buildings)
 ## Story 5-11: Shelters show recovery status instead of production
+## Story 6-8: Upgrade buildings show bonus description
 func _update_production_display(data: BuildingData) -> void:
 	if not _production_section:
 		return
@@ -474,6 +475,11 @@ func _update_production_display(data: BuildingData) -> void:
 	# SHELTER buildings show simplified status (Story 5-11)
 	if data.building_type == BuildingTypes.BuildingType.SHELTER:
 		_update_shelter_display(data)
+		return
+
+	# UPGRADE buildings show bonus info (Story 6-8)
+	if data.building_type == BuildingTypes.BuildingType.UPGRADE:
+		_update_upgrade_display(data)
 		return
 
 	# Show production section for BOTH gatherer AND processor buildings (AC11)
@@ -535,6 +541,35 @@ func _get_shelter_status_text(shelter_comp: Node, data: BuildingData) -> String:
 		return STATUS_SHELTER_FULL % [occupancy, max_capacity]
 	else:
 		return STATUS_SHELTER_PARTIAL % [occupancy, max_capacity]
+
+
+## Update display for UPGRADE buildings (School, Hospital, Warehouse) - Story 6-8
+func _update_upgrade_display(data: BuildingData) -> void:
+	# Hide PROCESSOR-specific UI
+	_hide_processor_ui()
+
+	# Show production section for bonus info
+	_production_section.visible = true
+
+	# Get bonus description from UpgradeBonusManager
+	var bonus_text := ""
+	if is_instance_valid(UpgradeBonusManager):
+		bonus_text = UpgradeBonusManager.get_bonus_description(data.building_id)
+
+	# Output label - show "Passive Bonus"
+	if _output_label:
+		_output_label.text = "Passive Bonus"
+
+	# Cycle time - hide for upgrade buildings (they don't have cycles)
+	if _cycle_label:
+		_cycle_label.text = "--"
+
+	# Production status - show the bonus description
+	if _status_label:
+		if bonus_text.is_empty():
+			_status_label.text = "No bonus info"
+		else:
+			_status_label.text = bonus_text
 
 
 ## Update display for GATHERER buildings (Farm, Sawmill)

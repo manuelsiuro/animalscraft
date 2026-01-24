@@ -44,6 +44,10 @@ func _ready() -> void:
 	EventBus.building_removed.connect(_on_building_removed)
 	EventBus.resource_changed.connect(_on_resource_changed)
 
+	# Connect to UpgradeBonusManager for Warehouse storage multiplier (Story 6-8)
+	if is_instance_valid(UpgradeBonusManager):
+		UpgradeBonusManager.bonuses_changed.connect(_on_bonuses_changed)
+
 	# Register with ResourceManager
 	if ResourceManager and ResourceManager.has_method("set_storage_manager"):
 		ResourceManager.set_storage_manager(self)
@@ -57,8 +61,9 @@ func _ready() -> void:
 
 ## Get total storage capacity for a resource type.
 ## Uses caching to avoid redundant iteration.
+## Applies Warehouse storage multiplier from UpgradeBonusManager (Story 6-8).
 ## @param resource_id The resource type identifier
-## @return Total storage capacity including base + building bonuses
+## @return Total storage capacity including base + building bonuses + multiplier
 func get_total_capacity(_resource_id: String) -> int:
 	# Check cache first
 	if _cached_capacity >= 0:
@@ -72,6 +77,14 @@ func get_total_capacity(_resource_id: String) -> int:
 			var building_data: BuildingData = _get_building_data(building)
 			if building_data and building_data.storage_capacity_bonus > 0:
 				total += building_data.storage_capacity_bonus
+
+	# Apply Warehouse storage multiplier (Story 6-8)
+	# Note: Warehouses themselves don't add flat storage - they multiply total capacity
+	# The storage_capacity_bonus in warehouse_data.tres is for legacy/fallback only
+	var multiplier := 1.0
+	if is_instance_valid(UpgradeBonusManager):
+		multiplier = UpgradeBonusManager.get_storage_multiplier()
+	total = int(float(total) * multiplier)
 
 	_cached_capacity = total
 	return total
@@ -202,6 +215,14 @@ func _on_resource_changed(_resource_id: String, _amount: int) -> void:
 	_storage_info_dirty = true
 
 
+## Handle upgrade bonus changes (Story 6-8).
+## Invalidates cache when Warehouse multiplier changes.
+func _on_bonuses_changed() -> void:
+	_invalidate_capacity_cache()
+	_emit_capacity_changed_for_all()
+	GameLogger.debug("StorageManager", "Capacity recalculated due to bonus change")
+
+
 # =============================================================================
 # HELPER METHODS
 # =============================================================================
@@ -235,6 +256,10 @@ func _exit_tree() -> void:
 		EventBus.building_removed.disconnect(_on_building_removed)
 	if EventBus.resource_changed.is_connected(_on_resource_changed):
 		EventBus.resource_changed.disconnect(_on_resource_changed)
+
+	# Disconnect from UpgradeBonusManager (Story 6-8)
+	if is_instance_valid(UpgradeBonusManager) and UpgradeBonusManager.bonuses_changed.is_connected(_on_bonuses_changed):
+		UpgradeBonusManager.bonuses_changed.disconnect(_on_bonuses_changed)
 
 	# Clear reference in ResourceManager
 	if ResourceManager and ResourceManager._storage_manager == self:

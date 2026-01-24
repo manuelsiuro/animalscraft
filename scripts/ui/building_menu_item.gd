@@ -38,7 +38,9 @@ const DRAG_THRESHOLD: float = 10.0
 const TYPE_COLORS := {
 	BuildingTypes.BuildingType.GATHERER: Color(0.4, 0.7, 0.3, 1),    # Green
 	BuildingTypes.BuildingType.STORAGE: Color(0.6, 0.45, 0.3, 1),   # Brown
-	BuildingTypes.BuildingType.PROCESSOR: Color(0.85, 0.5, 0.25, 1) # Orange
+	BuildingTypes.BuildingType.PROCESSOR: Color(0.85, 0.5, 0.25, 1), # Orange
+	BuildingTypes.BuildingType.SHELTER: Color(0.4, 0.4, 0.7, 1),    # Blue (Story 6-8)
+	BuildingTypes.BuildingType.UPGRADE: Color(0.7, 0.3, 0.7, 1),    # Purple (Story 6-8)
 }
 
 ## Default icon color

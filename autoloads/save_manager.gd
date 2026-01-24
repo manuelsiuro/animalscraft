@@ -457,6 +457,12 @@ func _gather_progression_data() -> Dictionary:
 	else:
 		progression_data["building_unlocks"] = {}
 
+	# Get upgrade bonus data from UpgradeBonusManager (Story 6-8)
+	if is_instance_valid(UpgradeBonusManager):
+		progression_data["upgrade_bonuses"] = UpgradeBonusManager.get_save_data()
+	else:
+		progression_data["upgrade_bonuses"] = {}
+
 	return progression_data
 
 
@@ -593,6 +599,13 @@ func _apply_progression_data(data: Dictionary) -> void:
 		GameLogger.debug("SaveManager", "Building unlocks restored")
 	else:
 		GameLogger.debug("SaveManager", "No building unlock data to restore")
+
+	# Load upgrade bonus data (Story 6-8)
+	if is_instance_valid(UpgradeBonusManager) and data.has("upgrade_bonuses"):
+		UpgradeBonusManager.load_save_data(data["upgrade_bonuses"])
+		GameLogger.debug("SaveManager", "Upgrade bonuses restored")
+	else:
+		GameLogger.debug("SaveManager", "No upgrade bonus data to restore")
 
 
 ## Migrate save data from older versions.

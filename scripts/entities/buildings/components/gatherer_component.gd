@@ -82,6 +82,9 @@ func _process(delta: float) -> void:
 	if _worker_timers.is_empty():
 		return
 
+	# Get effective production time (with School efficiency bonus - Story 6-8)
+	var effective_time := _get_effective_production_time()
+
 	# Update timers for all active workers
 	for animal_id: String in _worker_timers.keys():
 		# Skip paused workers (storage full)
@@ -90,9 +93,9 @@ func _process(delta: float) -> void:
 
 		_worker_timers[animal_id] += delta
 
-		# Check if production cycle complete
-		if _worker_timers[animal_id] >= _production_time:
-			_worker_timers[animal_id] -= _production_time  # Carry over excess to prevent drift
+		# Check if production cycle complete (using effective time)
+		if _worker_timers[animal_id] >= effective_time:
+			_worker_timers[animal_id] -= effective_time  # Carry over excess to prevent drift
 			_produce_resource(animal_id)
 
 # =============================================================================
@@ -206,10 +209,26 @@ func get_output_resource_id() -> String:
 	return _output_resource_id
 
 
-## Get the production time per cycle.
+## Get the production time per cycle (base time without bonuses).
 ## @return Time in seconds for one production cycle
 func get_production_time() -> float:
 	return _production_time
+
+
+## Get effective production time with School efficiency bonus (Story 6-8).
+## Production time is divided by efficiency multiplier (higher = faster).
+## @return Effective time in seconds for one production cycle
+func _get_effective_production_time() -> float:
+	var multiplier := 1.0
+	if is_instance_valid(UpgradeBonusManager):
+		multiplier = UpgradeBonusManager.get_efficiency_multiplier()
+	return _production_time / multiplier
+
+
+## Get effective production time (public API for UI display).
+## @return Effective time in seconds with bonuses applied
+func get_effective_production_time() -> float:
+	return _get_effective_production_time()
 
 
 ## Check if component is initialized.
@@ -244,7 +263,9 @@ func get_worker_progress(animal: Node) -> float:
 	if not _worker_timers.has(animal_id):
 		return -1.0
 
-	return clampf(_worker_timers[animal_id] / _production_time, 0.0, 1.0)
+	# Use effective time for accurate progress display (Story 6-8)
+	var effective_time := _get_effective_production_time()
+	return clampf(_worker_timers[animal_id] / effective_time, 0.0, 1.0)
 
 # =============================================================================
 # UTILITY

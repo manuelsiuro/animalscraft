@@ -264,6 +264,12 @@ static func get_building_icon(building_type: String) -> String:
 			return "\ud83c\udfe0"  # 🏠
 		"stockpile":
 			return "\ud83d\udce6"  # 📦
+		"school":
+			return "\ud83c\udfeb"  # 🏫 (Story 6-8)
+		"hospital":
+			return "\ud83c\udfe5"  # 🏥 (Story 6-8)
+		"warehouse":
+			return "\ud83c\udfec"  # 🏬 (Story 6-8) - department store/large storage
 		_:
 			return "\ud83c\udfd7\ufe0f"  # 🏗️
 
@@ -286,6 +292,12 @@ static func get_building_display_name(building_type: String) -> String:
 			return "Shelter"
 		"stockpile":
 			return "Stockpile"
+		"school":
+			return "School"  # Story 6-8
+		"hospital":
+			return "Hospital"  # Story 6-8
+		"warehouse":
+			return "Warehouse"  # Story 6-8
 		_:
 			# Capitalize first letter as fallback
 			if building_type.is_empty():

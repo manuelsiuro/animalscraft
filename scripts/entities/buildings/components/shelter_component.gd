@@ -87,10 +87,15 @@ func is_initialized() -> bool:
 	return _initialized
 
 
-## Get the energy recovery multiplier for this shelter
-## @return 2.0 (animals recover energy at 2x rate in shelter)
+## Get the energy recovery multiplier for this shelter.
+## Base is 2.0 (shelter bonus), with Hospital adds additional 2x (total 4x).
+## @return Recovery multiplier (2.0 base, or 4.0 with Hospital bonus - Story 6-8)
 func get_recovery_multiplier() -> float:
-	return RECOVERY_MULTIPLIER
+	var base_multiplier := RECOVERY_MULTIPLIER
+	# Apply Hospital bonus if available (Story 6-8)
+	if is_instance_valid(UpgradeBonusManager):
+		base_multiplier *= UpgradeBonusManager.get_rest_multiplier()
+	return base_multiplier
 
 
 ## Check if shelter is at full capacity

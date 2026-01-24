@@ -119,6 +119,9 @@ func _check_waiting_workers() -> void:
 
 ## Update timers for all active workers
 func _update_worker_timers(delta: float) -> void:
+	# Get effective production time (with School efficiency bonus - Story 6-8)
+	var effective_time := _get_effective_production_time()
+
 	for animal_id: String in _worker_timers.keys():
 		# Skip paused workers (storage full)
 		if _paused_workers.has(animal_id):
@@ -126,13 +129,13 @@ func _update_worker_timers(delta: float) -> void:
 
 		_worker_timers[animal_id] += delta
 
-		# Check if production cycle complete
-		if _worker_timers[animal_id] >= _recipe.production_time:
+		# Check if production cycle complete (using effective time)
+		if _worker_timers[animal_id] >= effective_time:
 			# Only decrement timer if production actually succeeded (AC6 fix)
 			if _complete_production(animal_id):
 				# Check key still exists (worker may have transitioned to waiting state)
 				if _worker_timers.has(animal_id):
-					_worker_timers[animal_id] -= _recipe.production_time  # Carry over excess
+					_worker_timers[animal_id] -= effective_time  # Carry over excess
 
 # =============================================================================
 # WORKER MANAGEMENT
@@ -304,12 +307,30 @@ func get_recipe() -> RecipeData:
 	return _recipe
 
 
-## Get production time per cycle from recipe.
+## Get production time per cycle from recipe (base time without bonuses).
 ## @return Time in seconds for one production cycle
 func get_production_time() -> float:
 	if _recipe:
 		return _recipe.production_time
 	return 0.0
+
+
+## Get effective production time with School efficiency bonus (Story 6-8).
+## Production time is divided by efficiency multiplier (higher = faster).
+## @return Effective time in seconds for one production cycle
+func _get_effective_production_time() -> float:
+	if not _recipe:
+		return 0.0
+	var multiplier := 1.0
+	if is_instance_valid(UpgradeBonusManager):
+		multiplier = UpgradeBonusManager.get_efficiency_multiplier()
+	return _recipe.production_time / multiplier
+
+
+## Get effective production time (public API for UI display).
+## @return Effective time in seconds with bonuses applied
+func get_effective_production_time() -> float:
+	return _get_effective_production_time()
 
 
 ## Get production progress for a specific worker (0.0 to 1.0).
@@ -323,10 +344,12 @@ func get_worker_progress(animal: Node) -> float:
 	if not _worker_timers.has(animal_id):
 		return -1.0
 
-	if _recipe == null or _recipe.production_time <= 0:
+	# Use effective time for accurate progress display (Story 6-8)
+	var effective_time := _get_effective_production_time()
+	if effective_time <= 0:
 		return 0.0
 
-	return clampf(_worker_timers[animal_id] / _recipe.production_time, 0.0, 1.0)
+	return clampf(_worker_timers[animal_id] / effective_time, 0.0, 1.0)
 
 
 ## Check if a specific worker is waiting for inputs.

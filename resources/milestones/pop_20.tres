@@ -10,4 +10,4 @@ description = "Reach 20 animals in your village"
 type = 0
 threshold = 20
 trigger_value = ""
-unlock_rewards = []
+unlock_rewards = ["school"]
