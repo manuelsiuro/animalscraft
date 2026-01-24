@@ -439,7 +439,7 @@ func _gather_resources_data() -> Dictionary:
 	return {"resources": {}}
 
 
-## Gather progression data including milestones.
+## Gather progression data including milestones and building unlocks.
 func _gather_progression_data() -> Dictionary:
 	var progression_data := {
 		"current_biome": "plains",
@@ -450,6 +450,12 @@ func _gather_progression_data() -> Dictionary:
 		progression_data["milestones"] = MilestoneManager.get_save_data()
 	else:
 		progression_data["milestones"] = {}
+
+	# Get building unlock data from BuildingUnlockManager (Story 6-7)
+	if is_instance_valid(BuildingUnlockManager):
+		progression_data["building_unlocks"] = BuildingUnlockManager.get_save_data()
+	else:
+		progression_data["building_unlocks"] = {}
 
 	return progression_data
 
@@ -572,7 +578,7 @@ func _apply_animals_data(data: Array) -> void:
 	GameLogger.debug("SaveManager", "Animals restoration: %d animals (stub)" % data.size())
 
 
-## Apply progression data including milestones.
+## Apply progression data including milestones and building unlocks.
 func _apply_progression_data(data: Dictionary) -> void:
 	# Load milestone data (Story 6-5)
 	if is_instance_valid(MilestoneManager) and data.has("milestones"):
@@ -580,6 +586,13 @@ func _apply_progression_data(data: Dictionary) -> void:
 		GameLogger.debug("SaveManager", "Milestones restored")
 	else:
 		GameLogger.debug("SaveManager", "No milestone data to restore")
+
+	# Load building unlock data (Story 6-7)
+	if is_instance_valid(BuildingUnlockManager) and data.has("building_unlocks"):
+		BuildingUnlockManager.load_save_data(data["building_unlocks"])
+		GameLogger.debug("SaveManager", "Building unlocks restored")
+	else:
+		GameLogger.debug("SaveManager", "No building unlock data to restore")
 
 
 ## Migrate save data from older versions.

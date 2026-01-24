@@ -1,9 +1,10 @@
 ## BuildingMenuPanel - Displays available buildings for construction.
 ## Shows building icons, names, resource costs, and handles affordability states.
 ## Opens via build button, closes on outside tap or building selection.
+## Only shows buildings that are unlocked via BuildingUnlockManager (Story 6-7).
 ##
 ## Architecture: scripts/ui/building_menu_panel.gd
-## Story: 3-4-create-building-menu-ui
+## Story: 3-4-create-building-menu-ui, 6-7-implement-building-unlocks
 class_name BuildingMenuPanel
 extends Control
 
@@ -59,6 +60,10 @@ func _ready() -> void:
 	if EventBus:
 		EventBus.resource_changed.connect(_on_resource_changed)
 
+	# Connect to BuildingUnlockManager for dynamic updates (Story 6-7, AC8)
+	if is_instance_valid(BuildingUnlockManager):
+		BuildingUnlockManager.unlock_state_changed.connect(_on_building_unlock_state_changed)
+
 	GameLogger.info("UI", "BuildingMenuPanel initialized")
 
 
@@ -66,6 +71,10 @@ func _exit_tree() -> void:
 	# Cleanup signal connections
 	if EventBus and EventBus.resource_changed.is_connected(_on_resource_changed):
 		EventBus.resource_changed.disconnect(_on_resource_changed)
+
+	# Disconnect from BuildingUnlockManager (Story 6-7)
+	if is_instance_valid(BuildingUnlockManager) and BuildingUnlockManager.unlock_state_changed.is_connected(_on_building_unlock_state_changed):
+		BuildingUnlockManager.unlock_state_changed.disconnect(_on_building_unlock_state_changed)
 
 	# Clear menu items
 	_clear_menu_items()
@@ -131,6 +140,15 @@ func _on_resource_changed(_resource_type: String, _new_amount: int) -> void:
 	_update_affordability_states()
 
 
+## Handle building unlock state change (Story 6-7, AC8)
+## Re-populate menu if visible when a building is unlocked
+func _on_building_unlock_state_changed(building_type: String) -> void:
+	if visible:
+		# Re-populate to show newly unlocked building
+		_populate_buildings()
+		GameLogger.debug("UI", "Building menu updated: %s unlocked" % building_type)
+
+
 func _on_building_item_selected(building_data: BuildingData) -> void:
 	# Emit selection signal
 	building_selected.emit(building_data)
@@ -174,7 +192,8 @@ func _populate_buildings() -> void:
 	GameLogger.debug("UI", "Populated %d buildings in menu" % _menu_items.size())
 
 
-## Load all building data resources from the resources folder
+## Load all building data resources from the resources folder.
+## Only returns buildings that are unlocked via BuildingUnlockManager (Story 6-7, AC3).
 func _load_building_data_resources() -> Array[BuildingData]:
 	var result: Array[BuildingData] = []
 
@@ -187,13 +206,24 @@ func _load_building_data_resources() -> Array[BuildingData]:
 				var path := BUILDING_RESOURCES_PATH + file_name
 				var data := load(path) as BuildingData
 				if data and data.is_valid():
-					result.append(data)
+					# Filter by unlock state (Story 6-7, AC3)
+					if _is_building_unlocked(data.building_id):
+						result.append(data)
 			file_name = dir.get_next()
 		dir.list_dir_end()
 	else:
 		GameLogger.warn("UI", "Cannot open building resources folder")
 
 	return result
+
+
+## Check if a building is unlocked (Story 6-7).
+## Returns true if BuildingUnlockManager says it's unlocked, or if manager doesn't exist (fallback).
+func _is_building_unlocked(building_id: String) -> bool:
+	if not is_instance_valid(BuildingUnlockManager):
+		# Fallback: allow all buildings if manager not available (for testing/compatibility)
+		return true
+	return BuildingUnlockManager.is_building_unlocked(building_id)
 
 
 ## Create a menu item for a building
