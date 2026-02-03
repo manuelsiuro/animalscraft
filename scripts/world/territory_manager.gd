@@ -510,7 +510,7 @@ func get_unowned_count() -> int:
 	if not _world_manager:
 		return 0
 	# Total hexes minus owned hexes
-	var total := _get_total_hex_count()
+	var total := get_total_hex_count()
 	return total - _ownership.size()
 
 
@@ -552,9 +552,10 @@ func _increment_count(owner_id: String) -> void:
 
 
 ## Get total hex count from WorldManager.
+## Public API for territory percentage calculations (Story 6-10).
 ##
 ## @return Total number of hexes in the world
-func _get_total_hex_count() -> int:
+func get_total_hex_count() -> int:
 	if not _world_manager:
 		return 0
 	# Use WorldManager's tile count or calculate from grid
@@ -826,8 +827,8 @@ func _check_activity_near_hex(hex: HexCoord) -> bool:
 		if not is_instance_valid(animal):
 			continue
 
-		# Skip wild animals (check for wild indicator)
-		if animal.has_method("is_wild") and animal.is_wild():
+		# Skip wild animals (check is_wild property)
+		if "is_wild" in animal and animal.is_wild:
 			continue
 
 		# Cast to Node3D for position access

@@ -21,6 +21,9 @@ signal celebration_dismissed()
 ## Auto-dismiss timer duration (AC5)
 const AUTO_DISMISS_TIME: float = 5.0
 
+## Victory milestone auto-dismiss (Story 6-10 AC9) - longer for impact
+const VICTORY_AUTO_DISMISS_TIME: float = 7.0
+
 ## Animation durations
 const FADE_DURATION: float = 0.3
 const SCALE_DURATION: float = 0.25
@@ -30,6 +33,9 @@ const ICON_BOUNCE_DURATION: float = 0.4
 const CONFETTI_PARTICLE_COUNT: int = 15
 const CONFETTI_DURATION: float = 2.0
 
+## Victory confetti multiplier (Story 6-10 AC9) - more prominent
+const VICTORY_CONFETTI_MULTIPLIER: int = 2
+
 ## Milestone type icons (AC3)
 const TYPE_ICONS: Dictionary = {
 	MilestoneData.Type.POPULATION: "\ud83d\udc65",
@@ -37,6 +43,7 @@ const TYPE_ICONS: Dictionary = {
 	MilestoneData.Type.TERRITORY: "\ud83d\uddfa\ufe0f",
 	MilestoneData.Type.COMBAT: "\u2694\ufe0f",
 	MilestoneData.Type.PRODUCTION: "\ud83c\udf5e",
+	MilestoneData.Type.VICTORY: "\ud83c\udfc6",  # Trophy icon (Story 6-10 AC9)
 }
 
 ## Type colors for subtle theming
@@ -46,6 +53,7 @@ const TYPE_COLORS: Dictionary = {
 	MilestoneData.Type.TERRITORY: Color("#70AD47"),    # Green
 	MilestoneData.Type.COMBAT: Color("#C55A5A"),       # Red
 	MilestoneData.Type.PRODUCTION: Color("#FFC000"),   # Gold
+	MilestoneData.Type.VICTORY: Color("#FFD700"),      # Bright gold (Story 6-10 AC9)
 }
 
 ## Warm, cozy popup colors (AC8)
@@ -263,11 +271,27 @@ func _spawn_confetti() -> void:
 	for child in _confetti_container.get_children():
 		child.queue_free()
 
+	# Get confetti count (Story 6-10: more for victory milestones)
+	var confetti_count := _get_confetti_count()
+
 	# Create confetti particles
-	for i in CONFETTI_PARTICLE_COUNT:
+	for i in confetti_count:
 		var confetti := _create_confetti_particle()
 		_confetti_container.add_child(confetti)
 		_animate_confetti_particle(confetti)
+
+
+## Get confetti particle count (Story 6-10 AC9).
+## Victory milestones get more confetti for enhanced celebration.
+func _get_confetti_count() -> int:
+	if _is_victory_milestone():
+		return CONFETTI_PARTICLE_COUNT * VICTORY_CONFETTI_MULTIPLIER
+	return CONFETTI_PARTICLE_COUNT
+
+
+## Check if current milestone is a victory type (Story 6-10 AC9).
+func _is_victory_milestone() -> bool:
+	return _current_milestone != null and _current_milestone.type == MilestoneData.Type.VICTORY
 
 
 ## Create a single confetti particle.
@@ -327,9 +351,11 @@ func _play_celebration_sound() -> void:
 # =============================================================================
 
 ## Start the auto-dismiss timer.
+## Victory milestones use longer timer (Story 6-10 AC9).
 func _start_auto_dismiss_timer() -> void:
 	if _dismiss_timer:
-		_dismiss_timer.start(AUTO_DISMISS_TIME)
+		var dismiss_time := VICTORY_AUTO_DISMISS_TIME if _is_victory_milestone() else AUTO_DISMISS_TIME
+		_dismiss_timer.start(dismiss_time)
 
 
 ## Stop the auto-dismiss timer.

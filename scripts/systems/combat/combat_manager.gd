@@ -157,6 +157,11 @@ var _battle_log: Array[BattleLogEntry] = []
 ## Reference to WorldManager
 var _world_manager: Node = null
 
+## Story 7-2: Guardian combat state
+var _is_guardian_battle: bool = false
+var _guardian_id: String = ""
+var _guardian_data: GuardianData = null
+
 # =============================================================================
 # LIFECYCLE
 # =============================================================================
@@ -165,12 +170,17 @@ func _ready() -> void:
 	add_to_group("combat_managers")
 	# Connect to combat team selection signal (AC1)
 	EventBus.combat_team_selected.connect(_on_combat_team_selected)
+	# Story 7-2: Connect to guardian battle signal
+	EventBus.guardian_battle_started.connect(_on_guardian_battle_started)
 
 
 ## Cleanup signal connections when removed from tree (AR18).
 func _exit_tree() -> void:
 	if EventBus.combat_team_selected.is_connected(_on_combat_team_selected):
 		EventBus.combat_team_selected.disconnect(_on_combat_team_selected)
+	# Story 7-2: Disconnect guardian signal
+	if EventBus.guardian_battle_started.is_connected(_on_guardian_battle_started):
+		EventBus.guardian_battle_started.disconnect(_on_guardian_battle_started)
 
 
 ## Initialize with WorldManager reference.
@@ -209,6 +219,16 @@ func get_current_hex() -> Vector2i:
 # =============================================================================
 # COMBAT INITIATION (AC1, AC2, AC23)
 # =============================================================================
+
+## Story 7-2: Check if current combat is a guardian battle.
+func is_guardian_battle() -> bool:
+	return _is_guardian_battle
+
+
+## Story 7-2: Get current guardian ID (if guardian battle).
+func get_guardian_id() -> String:
+	return _guardian_id
+
 
 ## Signal handler for combat_team_selected.
 func _on_combat_team_selected(team: Array, hex_coord: Vector2i, herd_id: String) -> void:
@@ -296,6 +316,137 @@ func start_combat(team: Array, hex_coord: Vector2i, herd_id: String) -> void:
 
 	# Start the battle loop
 	_execute_battle_loop()
+
+
+## Story 7-2: Signal handler for guardian_battle_started.
+func _on_guardian_battle_started(team: Array, guardian_id: String, hex_coord: Vector2i) -> void:
+	# Guard: reject if combat already active
+	if _is_combat_active:
+		GameLogger.warn("CombatManager", "Guardian battle request rejected: combat already active")
+		return
+
+	# Guard: validate inputs
+	if team.is_empty():
+		GameLogger.error("CombatManager", "Guardian battle rejected: empty team")
+		return
+
+	if guardian_id.is_empty():
+		GameLogger.error("CombatManager", "Guardian battle rejected: empty guardian_id")
+		return
+
+	start_guardian_combat(team, guardian_id, hex_coord)
+
+
+## Story 7-2: Start combat against a guardian (AC5).
+## Guardians are single powerful enemies with HP = strength * HP_MULTIPLIER.
+## @param team Array of Animal nodes (player's combat team)
+## @param guardian_id The guardian to fight
+## @param hex_coord The guardian's hex location
+func start_guardian_combat(team: Array, guardian_id: String, hex_coord: Vector2i) -> void:
+	# Guard: reject if already active
+	if _is_combat_active:
+		GameLogger.warn("CombatManager", "start_guardian_combat rejected: combat already active")
+		return
+
+	# Get guardian data from GuardianManager
+	var guardian_manager := _get_guardian_manager()
+	if not guardian_manager:
+		GameLogger.error("CombatManager", "Cannot find GuardianManager, aborting guardian combat")
+		return
+
+	var guardian_data: GuardianData = guardian_manager.get_guardian_data(guardian_id)
+	if not guardian_data:
+		GameLogger.error("CombatManager", "Guardian %s not found, aborting combat" % guardian_id)
+		return
+
+	# Set guardian battle state
+	_is_combat_active = true
+	_is_guardian_battle = true
+	_guardian_id = guardian_id
+	_guardian_data = guardian_data
+	_current_hex = hex_coord
+	_current_herd_id = ""
+
+	# Clear previous battle state
+	_player_team.clear()
+	_enemy_team.clear()
+	_turn_queue.clear()
+	_battle_log.clear()
+	_turn_number = 0
+
+	GameLogger.info("CombatManager", "Starting guardian combat at %s against %s" % [hex_coord, guardian_id])
+
+	# Create player CombatUnits
+	for animal in team:
+		if animal:
+			var unit := CombatUnit.new(animal, true)
+			_player_team.append(unit)
+			GameLogger.debug("CombatManager", "Player unit: %s (HP: %d, STR: %d)" % [
+				unit.unit_id, unit.max_hp, unit.get_strength()
+			])
+
+	# Create guardian CombatUnit (Story 7-2 AC5: HP = strength * HP_MULTIPLIER = 18)
+	var guardian_unit := _create_guardian_combat_unit(guardian_data)
+	_enemy_team.append(guardian_unit)
+	GameLogger.info("CombatManager", "Guardian unit: %s (HP: %d, STR: %d)" % [
+		guardian_unit.unit_id, guardian_unit.max_hp, guardian_unit.get_strength()
+	])
+
+	# Build turn queue
+	_build_turn_queue(_player_team, _enemy_team)
+
+	# Emit combat started signal
+	EventBus.combat_started.emit(hex_coord)
+
+	# Start the battle loop
+	_execute_battle_loop()
+
+
+## Story 7-2: Create a CombatUnit for a guardian based on GuardianData.
+## Guardian HP = strength * HP_MULTIPLIER (e.g., 6 * 3 = 18 for Alpha Fox).
+func _create_guardian_combat_unit(guardian_data: GuardianData) -> CombatUnit:
+	# Create a mock "animal" that provides the guardian's stats
+	# We use a Node3D wrapper since CombatUnit expects Node
+	var guardian_mock := GuardianCombatMock.new()
+	guardian_mock.setup(guardian_data)
+	add_child(guardian_mock)  # Add to tree temporarily for combat
+
+	# Create CombatUnit with guardian mock (is_player_team = false)
+	var unit := CombatUnit.new(guardian_mock, false)
+	unit.unit_id = guardian_data.guardian_id
+
+	return unit
+
+
+## Story 7-2: Get GuardianManager from scene tree.
+func _get_guardian_manager() -> Node:
+	var managers := get_tree().get_nodes_in_group("guardian_managers")
+	if not managers.is_empty():
+		return managers[0]
+
+	# Try WorldManager
+	if _world_manager and _world_manager.has_method("get_guardian_manager"):
+		return _world_manager.get_guardian_manager()
+
+	return null
+
+
+# =============================================================================
+# Story 7-2: Guardian Combat Mock
+# =============================================================================
+
+## Mock object that provides guardian stats for CombatUnit.
+## Allows CombatUnit to treat guardians like animals for damage calculations.
+## Note: Extends Node3D to be compatible with CombatUnit which expects Node.
+class GuardianCombatMock extends Node3D:
+	var stats: GuardianData
+
+	func setup(p_stats: GuardianData) -> void:
+		stats = p_stats
+
+	func get_animal_id() -> String:
+		return stats.guardian_id if stats else "guardian"
+
 
 # =============================================================================
 # TURN ORDER SYSTEM (AC3, AC4, AC10)
@@ -490,8 +641,14 @@ func _check_all_knocked_out(team: Array[CombatUnit]) -> bool:
 
 ## Process player victory (AC15, AC17, AC18).
 ## Story 5-7: Also scouts adjacent hexes after claiming territory.
+## Story 7-2: Handle guardian defeat with biome unlock.
 func _process_victory() -> void:
 	GameLogger.info("CombatManager", "VICTORY! Player wins at %s" % _current_hex)
+
+	# Story 7-2: Handle guardian victory differently (AC6)
+	if _is_guardian_battle:
+		_process_guardian_victory()
+		return
 
 	# Collect captured animal types (AC15)
 	var captured_types: Array = []
@@ -523,6 +680,44 @@ func _process_victory() -> void:
 
 	# Emit combat ended signal (AC15)
 	EventBus.combat_ended.emit(true, captured_types)
+
+	# Reset state
+	_reset_combat_state()
+
+
+## Story 7-2: Process guardian victory - defeat guardian and unlock biome (AC6).
+func _process_guardian_victory() -> void:
+	GameLogger.info("CombatManager", "GUARDIAN DEFEATED! %s at %s" % [_guardian_id, _current_hex])
+
+	# Get guardian manager to process defeat
+	var guardian_manager := _get_guardian_manager()
+	if guardian_manager and guardian_manager.has_method("defeat_guardian"):
+		guardian_manager.defeat_guardian(_guardian_id)
+		GameLogger.info("CombatManager", "Guardian %s permanently defeated, biome unlock triggered" % _guardian_id)
+
+		# M2 Fix: Trigger celebration notification (AC6)
+		if _guardian_data:
+			var milestone_managers := get_tree().get_nodes_in_group("milestone_managers")
+			if not milestone_managers.is_empty():
+				var mm = milestone_managers[0]
+				if mm.has_method("show_celebration"):
+					var title := "🎉 %s Defeated!" % _guardian_id.replace("_", " ").capitalize()
+					mm.show_celebration(title, _guardian_data.reward_description)
+	else:
+		# Fallback: emit signal directly
+		if _guardian_data:
+			EventBus.guardian_defeated.emit(_guardian_id, _guardian_data.unlocks_biome)
+		GameLogger.warn("CombatManager", "GuardianManager not found, emitted guardian_defeated signal directly")
+
+	# Claim the guardian's territory
+	var territory_manager := _get_territory_manager()
+	if territory_manager:
+		var hex := HexCoord.from_vector(_current_hex)
+		territory_manager.set_hex_owner(hex, "player", "guardian_defeat")
+		GameLogger.info("CombatManager", "Guardian territory claimed at %s" % _current_hex)
+
+	# Emit combat ended signal (no captured animals for guardians)
+	EventBus.combat_ended.emit(true, [])
 
 	# Reset state
 	_reset_combat_state()
@@ -694,9 +889,20 @@ func _reset_combat_state() -> void:
 	_is_combat_active = false
 	_current_hex = Vector2i.ZERO
 	_current_herd_id = ""
+
+	# Story 7-2 M1 Fix: Clean up guardian mock nodes before clearing teams
+	if _is_guardian_battle:
+		for unit in _enemy_team:
+			if unit.animal and unit.animal is GuardianCombatMock:
+				unit.animal.queue_free()
+
 	_player_team.clear()
 	_enemy_team.clear()
 	_turn_queue.clear()
 	_current_turn_index = 0
 	_turn_number = 0
+	# Story 7-2: Reset guardian state
+	_is_guardian_battle = false
+	_guardian_id = ""
+	_guardian_data = null
 	# Note: Keep _battle_log for UI access (AC25)

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MilestoneData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/progression/milestone_data.gd" id="1_milestone"]
+
+[resource]
+script = ExtResource("1_milestone")
+id = "victory_master_crafter"
+display_name = "Master Crafter!"
+description = "You've completed the full production chain and baked your first Bread. True craftsmanship!"
+type = 5
+threshold = 1
+trigger_value = "bread"
+unlock_rewards = []

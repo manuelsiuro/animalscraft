@@ -225,9 +225,10 @@ func test_wild_herd_get_animal_types() -> void:
 
 	var types := herd.get_animal_types()
 	assert_eq(types.size(), 3, "Should have 3 animal types listed")
-	# All should be rabbits currently
+	# All should be from PLAINS_ANIMALS (Story 7-1)
 	for animal_type in types:
-		assert_eq(animal_type, "rabbit")
+		assert_has(WildHerdManager.PLAINS_ANIMALS, animal_type,
+			"Animal type '%s' should be a valid Plains animal" % animal_type)
 
 # =============================================================================
 # HERD REMOVAL TESTS (AC: 10)
@@ -384,11 +385,11 @@ func test_herd_composition_uses_biome_animals() -> void:
 	# Wait for animal initialization
 	await wait_frames(2)
 
-	# All animals should be from PLAINS_ANIMALS
+	# All animals should be from PLAINS_ANIMALS (Story 7-1: all 4 types now available)
 	for animal in herd.animals:
 		assert_not_null(animal)
-		# Currently only rabbit is available
-		assert_eq(animal.get_animal_id(), "rabbit")
+		assert_has(WildHerdManager.PLAINS_ANIMALS, animal.get_animal_id(),
+			"Animal type '%s' should be a valid Plains animal" % animal.get_animal_id())
 
 
 func test_herd_composition_size_matches_request() -> void:
@@ -396,6 +397,32 @@ func test_herd_composition_size_matches_request() -> void:
 		var hex := HexCoord.create(42 + size, 42 + size)
 		var herd := _wild_herd_manager.spawn_herd(hex, size)
 		assert_eq(herd.get_animal_count(), size)
+
+
+func test_herd_composition_uses_multiple_animal_types() -> void:
+	# Story 7-1: Verify composition actually uses diversity from PLAINS_ANIMALS
+	# Spawn multiple max-size herds and track unique animal types seen
+	var all_types_seen: Dictionary = {}
+
+	for i in range(10):
+		var hex := HexCoord.create(200 + i, 200 + i)
+		var herd := _wild_herd_manager.spawn_herd(hex, 5)  # Max size
+
+		assert_not_null(herd, "Herd %d should spawn" % i)
+
+		# Wait for animal initialization
+		await wait_frames(2)
+
+		# Track all animal types in this herd
+		for animal in herd.animals:
+			if animal and animal.stats:
+				all_types_seen[animal.stats.animal_id] = true
+
+	# With 10 herds of 5 animals each (50 animals total), probability of seeing
+	# only 1 type with 4 available is (1/4)^49 ≈ 0%, so we should see diversity
+	assert_gte(all_types_seen.size(), 2,
+		"Should see at least 2 different animal types across 10 herds (saw: %s)" % all_types_seen.keys())
+
 
 # =============================================================================
 # VISUAL OFFSET TESTS (AC: 6)

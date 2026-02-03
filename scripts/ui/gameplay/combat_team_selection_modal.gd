@@ -1,9 +1,10 @@
 ## CombatTeamSelectionModal - Modal UI for selecting combat team before battle.
 ## Displays available animals, allows selection (1-5), shows team summary and difficulty.
 ## Appears when player requests combat from contested territory preview.
+## Story 7-2: Extended to support Guardian battles with special UI and rewards display.
 ##
 ## Architecture: scripts/ui/gameplay/combat_team_selection_modal.gd
-## Story: 5-4-create-combat-team-selection-ui
+## Story: 5-4-create-combat-team-selection-ui, 7-2-implement-alpha-fox-guardian
 class_name CombatTeamSelectionModal
 extends Control
 
@@ -92,6 +93,11 @@ var _is_showing: bool = false
 ## Animation tween
 var _fade_tween: Tween
 
+## Story 7-2: Guardian mode state
+var _is_guardian_battle: bool = false
+var _guardian_data: GuardianData = null
+var _guardian_id: String = ""
+
 # =============================================================================
 # LIFECYCLE
 # =============================================================================
@@ -174,6 +180,112 @@ func show_for_combat(hex_coord: Vector2i, herd_id: String) -> void:
 	GameLogger.info("UI", "CombatTeamSelectionModal shown for hex %s, herd %s" % [hex_coord, herd_id])
 
 
+## Story 7-2: Show the modal for a guardian battle (AC4).
+## @param guardian_data The GuardianData resource for the guardian
+## @param guardian_id The guardian's unique ID
+func show_for_guardian(guardian_data: GuardianData, guardian_id: String) -> void:
+	if not guardian_data:
+		GameLogger.warn("UI", "CombatTeamSelectionModal: Cannot show with null guardian_data")
+		return
+
+	_is_guardian_battle = true
+	_guardian_data = guardian_data
+	_guardian_id = guardian_id
+	_current_hex = guardian_data.spawn_hex
+	_current_herd_id = ""  # No herd for guardians
+	_herd_data = null
+
+	# Clear previous selection
+	_selected_animals.clear()
+
+	# Populate guardian info (special display)
+	_populate_guardian_info(guardian_data)
+
+	# Populate animal list (same as regular combat)
+	_populate_animal_list()
+
+	# Update team summary
+	_update_team_summary()
+
+	# Update fight button state
+	_update_fight_button_state()
+
+	# Show with animation
+	_show_with_animation()
+
+	GameLogger.info("UI", "CombatTeamSelectionModal shown for guardian %s at %s" % [guardian_id, guardian_data.spawn_hex])
+
+
+## Story 7-2: Populate guardian information display.
+func _populate_guardian_info(guardian: GuardianData) -> void:
+	if not guardian:
+		return
+
+	# Change title for guardian battles
+	if _enemy_title_label:
+		_enemy_title_label.text = "👑 GUARDIAN: %s" % guardian.guardian_id.to_upper().replace("_", " ")
+
+	# Strength display (guardian HP = strength * 3)
+	if _enemy_strength_label:
+		var guardian_hp := guardian.strength * 3  # HP_MULTIPLIER
+		_enemy_strength_label.text = "💪 Strength: %d (HP: %d)" % [guardian.strength, guardian_hp]
+
+	# Show difficulty and reward in animal icons area
+	if _enemy_animal_icons:
+		# Clear existing
+		for child in _enemy_animal_icons.get_children():
+			child.queue_free()
+
+		# Add difficulty
+		var difficulty_label := Label.new()
+		difficulty_label.text = "📊 %s" % guardian.difficulty_rating
+		difficulty_label.add_theme_font_size_override("font_size", 14)
+		difficulty_label.add_theme_color_override("font_color", _get_difficulty_color_for_guardian(guardian.difficulty_rating))
+		_enemy_animal_icons.add_child(difficulty_label)
+
+		# Add spacer
+		var spacer := Control.new()
+		spacer.custom_minimum_size = Vector2(10, 0)
+		_enemy_animal_icons.add_child(spacer)
+
+		# Add reward
+		var reward_label := Label.new()
+		reward_label.text = "🎁 %s" % guardian.reward_description
+		reward_label.add_theme_font_size_override("font_size", 14)
+		reward_label.add_theme_color_override("font_color", Color(0.2, 0.8, 0.4, 1))
+		_enemy_animal_icons.add_child(reward_label)
+
+
+## Story 7-2: Get color for guardian difficulty rating.
+func _get_difficulty_color_for_guardian(difficulty: String) -> Color:
+	match difficulty.to_lower():
+		"easy":
+			return COLOR_EASY
+		"medium":
+			return COLOR_MEDIUM
+		"hard", "challenging":
+			return COLOR_HIGH
+		"dangerous", "extreme":
+			return COLOR_DANGEROUS
+		_:
+			return COLOR_UNKNOWN
+
+
+## Story 7-2: Check if current battle is a guardian battle.
+func is_guardian_battle() -> bool:
+	return _is_guardian_battle
+
+
+## Story 7-2: Get current guardian data (if guardian battle).
+func get_guardian_data() -> GuardianData:
+	return _guardian_data
+
+
+## Story 7-2: Get current guardian ID (if guardian battle).
+func get_guardian_id() -> String:
+	return _guardian_id
+
+
 ## Dismiss the modal with fade-out animation (AC 15, 17).
 func dismiss() -> void:
 	if not _is_showing:
@@ -190,6 +302,10 @@ func dismiss() -> void:
 	_fade_tween.tween_callback(func():
 		visible = false
 		_clear_animal_list()
+		# Story 7-2: Reset guardian state
+		_is_guardian_battle = false
+		_guardian_data = null
+		_guardian_id = ""
 	)
 
 	GameLogger.debug("UI", "CombatTeamSelectionModal dismissed")
@@ -514,8 +630,13 @@ func _update_team_summary() -> void:
 			_no_animals_label.visible = false
 
 	# Calculate difficulty (AC 4, 12)
-	var herd_strength := _herd_data.get_total_strength() if _herd_data else 0
-	var difficulty := _calculate_difficulty(team_strength, herd_strength)
+	# Story 7-2: Use guardian strength if guardian battle
+	var enemy_strength: int
+	if _is_guardian_battle and _guardian_data:
+		enemy_strength = _guardian_data.strength
+	else:
+		enemy_strength = _herd_data.get_total_strength() if _herd_data else 0
+	var difficulty := _calculate_difficulty(team_strength, enemy_strength)
 
 	if _difficulty_label:
 		_difficulty_label.text = "Difficulty: %s" % difficulty["label"]
@@ -588,6 +709,7 @@ func _on_cancel_pressed() -> void:
 
 
 ## Handle fight button pressed (AC 16).
+## Story 7-2: Extended to handle guardian battles.
 func _on_fight_pressed() -> void:
 	if _selected_animals.size() < MIN_TEAM_SIZE:
 		return
@@ -597,16 +719,25 @@ func _on_fight_pressed() -> void:
 	for animal in _selected_animals:
 		team_array.append(animal)
 
-	# Emit local signal
-	combat_team_selected.emit(team_array, _current_hex, _current_herd_id)
+	# Story 7-2: Handle guardian battles differently
+	if _is_guardian_battle and _guardian_id != "":
+		# Emit guardian battle signal
+		EventBus.guardian_battle_started.emit(team_array, _guardian_id, _current_hex)
+		GameLogger.info("UI", "Guardian battle started: %d animals vs %s at %s" % [
+			team_array.size(), _guardian_id, _current_hex
+		])
+	else:
+		# Standard herd combat
+		# Emit local signal
+		combat_team_selected.emit(team_array, _current_hex, _current_herd_id)
 
-	# Emit EventBus signal for cross-system communication (AR5)
-	if EventBus:
-		EventBus.combat_team_selected.emit(team_array, _current_hex, _current_herd_id)
+		# Emit EventBus signal for cross-system communication (AR5)
+		if EventBus:
+			EventBus.combat_team_selected.emit(team_array, _current_hex, _current_herd_id)
 
-	GameLogger.info("UI", "Combat team selected: %d animals for hex %s, herd %s" % [
-		team_array.size(), _current_hex, _current_herd_id
-	])
+		GameLogger.info("UI", "Combat team selected: %d animals for hex %s, herd %s" % [
+			team_array.size(), _current_hex, _current_herd_id
+		])
 
 	dismiss()
 
@@ -669,14 +800,25 @@ func _show_working_animal_warning(animal: Animal) -> void:
 
 
 ## Check if current difficulty is dangerous (for warning banner visibility).
+## M3 Fix: Support both guardian battles and herd battles.
 func _is_dangerous_difficulty() -> bool:
-	if _selected_animals.is_empty() or not _herd_data:
+	if _selected_animals.is_empty():
 		return false
+
 	var team_strength := _calculate_team_strength()
-	var herd_strength := _herd_data.get_total_strength()
 	if team_strength == 0:
 		return false
-	var ratio: float = float(herd_strength) / team_strength
+
+	# Get enemy strength based on battle type
+	var enemy_strength: int
+	if _is_guardian_battle and _guardian_data:
+		enemy_strength = _guardian_data.strength
+	elif _herd_data:
+		enemy_strength = _herd_data.get_total_strength()
+	else:
+		return false
+
+	var ratio: float = float(enemy_strength) / team_strength
 	return ratio >= DIFFICULTY_HIGH_MAX
 
 

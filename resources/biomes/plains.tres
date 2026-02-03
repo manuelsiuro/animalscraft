@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BiomeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/biome/biome_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "plains"
+display_name = "The Plains"
+description = "Rolling grasslands where your village begins. Home to rabbits and gentle creatures."
+unlock_milestone = ""
+terrain_types = Array[String](["grass", "dirt", "water"])
+animal_types = Array[String](["rabbit"])
+is_starting_biome = true

@@ -498,3 +498,26 @@ signal shelter_capacity_reached(shelter: Node)
 ## Fired when an animal leaves a previously full shelter (4→3).
 ## @param shelter The Building node (shelter) that now has capacity
 signal shelter_capacity_available(shelter: Node)
+
+# =============================================================================
+# GUARDIAN EVENTS (Story 7-2)
+# =============================================================================
+
+## Story 7-2: Emitted when a guardian spawns in the world.
+## Fired when milestone triggers guardian spawn (e.g., forest_border → Alpha Fox).
+## @param guardian_id The unique ID of the spawned guardian
+## @param hex_coord The Vector2i axial coordinates of the guardian location
+signal guardian_spawned(guardian_id: String, hex_coord: Vector2i)
+
+## Story 7-2: Emitted when a guardian is defeated in combat.
+## Fired when player wins combat against a guardian, permanently removing it.
+## @param guardian_id The unique ID of the defeated guardian
+## @param biome_id The biome unlocked by this guardian's defeat
+signal guardian_defeated(guardian_id: String, biome_id: String)
+
+## Story 7-2: Emitted when player initiates a guardian battle from the UI.
+## Fired when player selects combat team and confirms fight against a guardian.
+## @param team Array of Animal nodes selected for combat
+## @param guardian_id The guardian to fight
+## @param hex_coord The guardian's hex location
+signal guardian_battle_started(team: Array, guardian_id: String, hex_coord: Vector2i)

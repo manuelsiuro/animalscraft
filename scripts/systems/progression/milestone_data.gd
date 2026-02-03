@@ -19,6 +19,7 @@ enum Type {
 	TERRITORY,    ## Triggered when claimed hex count reaches threshold
 	COMBAT,       ## Triggered when combat win count reaches threshold
 	PRODUCTION,   ## Triggered on first production of resource type
+	VICTORY,      ## Special victory milestones (Story 6-10) - endless mode achievements
 }
 
 # =============================================================================

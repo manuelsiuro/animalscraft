@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AnimalStats" load_steps=2 format=3 uid="uid://c3squirrel7stats"]
+
+[ext_resource type="Script" path="res://scripts/entities/animals/animal_stats.gd" id="1_animal_stats"]
+
+[resource]
+script = ExtResource("1_animal_stats")
+animal_id = "squirrel"
+energy = 4
+speed = 3
+strength = 2
+specialty = "Tree resources +25%"
+biome = "plains"

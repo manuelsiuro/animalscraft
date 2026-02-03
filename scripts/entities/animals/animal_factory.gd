@@ -14,10 +14,11 @@ extends RefCounted
 ## Preloaded animal scenes by type
 const ANIMAL_SCENES: Dictionary = {
 	"rabbit": preload("res://scenes/entities/animals/rabbit.tscn"),
+	"squirrel": preload("res://scenes/entities/animals/squirrel.tscn"),
+	"fox": preload("res://scenes/entities/animals/fox.tscn"),
+	"deer": preload("res://scenes/entities/animals/deer.tscn"),
 	# Future animals added here as scenes are created:
 	# "beaver": preload("res://scenes/entities/animals/beaver.tscn"),
-	# "squirrel": preload("res://scenes/entities/animals/squirrel.tscn"),
-	# "fox": preload("res://scenes/entities/animals/fox.tscn"),
 }
 
 ## Template path for loading stats resources

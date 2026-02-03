@@ -67,7 +67,8 @@ const HERD_SPACING: int = 3
 const MAX_HERDS_PER_BIOME: int = 30
 
 ## Plains biome animal types (from GDD)
-const PLAINS_ANIMALS: Array[String] = ["rabbit"]  # Only rabbit available currently
+## Story 7-1: All 4 Plains animals now available
+const PLAINS_ANIMALS: Array[String] = ["rabbit", "squirrel", "fox", "deer"]
 
 ## Herd size range
 const MIN_HERD_SIZE: int = 2
@@ -302,8 +303,8 @@ func _calculate_herd_composition(biome: String, size: int) -> Array[String]:
 		# Future: add other biome animals
 		available = PLAINS_ANIMALS.duplicate()
 
-	# Mix of workers (~60%) and fighters (~40%) per GDD
-	# With only rabbit available, all will be rabbits
+	# Story 7-1: All 4 Plains animals available (rabbit, squirrel, fox, deer)
+	# Random selection provides natural mix of workers and fighters
 	for i in size:
 		# Randomly select from available types
 		var type := available[randi() % available.size()]

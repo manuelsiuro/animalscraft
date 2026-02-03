@@ -166,6 +166,10 @@ func _get_idle_animals() -> Array[Animal]:
 		if not animal.is_initialized():
 			continue
 
+		# Skip wild animals - they can't be assigned as workers
+		if animal.is_wild:
+			continue
+
 		# Check if already assigned to a building
 		if animal.has_assigned_building():
 			continue

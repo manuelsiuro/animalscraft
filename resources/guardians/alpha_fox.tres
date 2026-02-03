@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GuardianData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/entities/guardians/guardian_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+guardian_id = "alpha_fox"
+unlocks_biome = "forest"
+difficulty_rating = "Easy"
+reward_description = "Opens Forest Biome"
+spawn_hex = Vector2i(5, 5)
+spawn_milestone = "forest_border"
+animal_id = "alpha_fox"
+energy = 8
+speed = 5
+strength = 6
+specialty = "Biome Guardian - defeats unlock Forest"
+biome = "plains"

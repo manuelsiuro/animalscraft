@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="BiomeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/biome/biome_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "forest"
+display_name = "The Forest"
+description = "Dense woodland teeming with new wildlife. Coming in a future update!"
+unlock_milestone = "forest_border"
+terrain_types = Array[String](["forest", "grass", "water"])
+animal_types = Array[String](["fox", "deer"])
+is_starting_biome = false

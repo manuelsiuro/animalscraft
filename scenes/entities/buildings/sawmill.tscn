@@ -4,6 +4,7 @@
 [ext_resource type="Script" path="res://scripts/entities/animals/components/selectable_component.gd" id="2_selectable"]
 [ext_resource type="Script" path="res://scripts/entities/buildings/components/worker_slot_component.gd" id="3_worker_slots"]
 [ext_resource type="Script" path="res://scripts/entities/buildings/components/gatherer_component.gd" id="4_gatherer"]
+[ext_resource type="PackedScene" path="res://assets/models/buildings/sawmill.glb" id="5_model"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_sawmill"]
 size = Vector3(1, 1, 1)
@@ -17,9 +18,13 @@ script = ExtResource("1_building")
 [node name="Visual" type="Node3D" parent="."]
 
 [node name="Placeholder" type="MeshInstance3D" parent="Visual"]
+visible = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 mesh = SubResource("BoxMesh_sawmill")
 surface_material_override/0 = SubResource("Material_sawmill")
+
+[node name="Model" parent="Visual" instance=ExtResource("5_model")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="SelectableComponent" type="Node" parent="."]
 script = ExtResource("2_selectable")

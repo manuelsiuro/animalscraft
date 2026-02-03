@@ -469,6 +469,12 @@ func _gather_progression_data() -> Dictionary:
 	else:
 		progression_data["tutorial"] = {}
 
+	# Get biome data from BiomeManager (Story 6-11)
+	if is_instance_valid(BiomeManager):
+		progression_data["biomes"] = BiomeManager.get_save_data()
+	else:
+		progression_data["biomes"] = {}
+
 	return progression_data
 
 
@@ -619,6 +625,13 @@ func _apply_progression_data(data: Dictionary) -> void:
 		GameLogger.debug("SaveManager", "Tutorial state restored")
 	else:
 		GameLogger.debug("SaveManager", "No tutorial data to restore")
+
+	# Load biome data (Story 6-11)
+	if is_instance_valid(BiomeManager) and data.has("biomes"):
+		BiomeManager.load_save_data(data["biomes"])
+		GameLogger.debug("SaveManager", "Biome state restored")
+	else:
+		GameLogger.debug("SaveManager", "No biome data to restore")
 
 
 ## Migrate save data from older versions.

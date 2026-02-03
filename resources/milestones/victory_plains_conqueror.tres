@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MilestoneData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/progression/milestone_data.gd" id="1_milestone"]
+
+[resource]
+script = ExtResource("1_milestone")
+id = "victory_plains_conqueror"
+display_name = "Plains Conqueror!"
+description = "You have claimed 80% of the Plains territory. The land is yours!"
+type = 5
+threshold = 80
+trigger_value = "territory_percentage"
+unlock_rewards = []

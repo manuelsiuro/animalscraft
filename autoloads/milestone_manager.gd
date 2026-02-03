@@ -42,6 +42,9 @@ var _counts: Dictionary = {
 	"combat_wins": 0,
 }
 
+## Territory percentage for victory tracking (Story 6-10)
+var _territory_percentage: float = 0.0
+
 ## First-time tracking for unique milestones (building_type -> true)
 var _first_buildings: Dictionary = {}
 
@@ -175,6 +178,7 @@ func get_save_data() -> Dictionary:
 		"counts": _counts.duplicate(),
 		"first_buildings": _first_buildings.keys(),
 		"first_productions": _first_productions.keys(),
+		"territory_percentage": _territory_percentage,  # Story 6-10
 	}
 
 
@@ -206,6 +210,9 @@ func load_save_data(data: Dictionary) -> void:
 	for output_type in productions_list:
 		_first_productions[output_type] = true
 
+	# Restore territory percentage (Story 6-10)
+	_territory_percentage = data.get("territory_percentage", 0.0)
+
 	_loading = false
 	GameLogger.info("MilestoneManager", "Loaded %d achieved milestones" % _achieved.size())
 
@@ -220,6 +227,7 @@ func reset() -> void:
 	}
 	_first_buildings.clear()
 	_first_productions.clear()
+	_territory_percentage = 0.0  # Story 6-10
 	GameLogger.info("MilestoneManager", "Milestone progress reset")
 
 # =============================================================================
@@ -235,6 +243,7 @@ func _on_animal_spawned(animal: Node) -> void:
 	if animal is Animal and not animal.is_wild:
 		_counts["population"] += 1
 		_check_population_milestones()
+		_check_victory_milestones()
 
 
 ## Handle animal removed event.
@@ -272,7 +281,9 @@ func _on_territory_claimed(_hex_coord: Vector2i) -> void:
 		return
 
 	_counts["territory"] += 1
+	_update_territory_percentage()
 	_check_territory_milestones()
+	_check_victory_milestones()
 
 # =============================================================================
 # EVENT HANDLERS - COMBAT (AC5)
@@ -299,6 +310,7 @@ func _on_production_completed(_building: Node, output_type: String) -> void:
 	if output_type != "" and not _first_productions.has(output_type):
 		_first_productions[output_type] = true
 		_check_production_milestones(output_type)
+		_check_victory_milestones()
 
 # =============================================================================
 # MILESTONE CHECKING
@@ -324,14 +336,27 @@ func _check_building_milestones(building_type: String) -> void:
 				_try_achieve_milestone(id)
 
 
-## Check territory milestones against current count.
+## Check territory milestones against current count or percentage.
+## Supports both raw count milestones (territory_10, territory_25) and
+## percentage-based milestones (forest_border) via trigger_value.
+## Story 6-11: Added territory_percentage support for biome unlocks.
 func _check_territory_milestones() -> void:
 	var current: int = _counts["territory"]
 
 	for id in _milestones:
 		var milestone: MilestoneData = _milestones[id]
 		if milestone.type == MilestoneData.Type.TERRITORY:
-			if current >= milestone.threshold:
+			var should_trigger := false
+
+			# Check trigger type: percentage or raw count
+			if milestone.trigger_value == "territory_percentage":
+				# Percentage-based (e.g., forest_border at 80%)
+				should_trigger = _territory_percentage >= float(milestone.threshold)
+			else:
+				# Raw count-based (e.g., territory_10, territory_25)
+				should_trigger = current >= milestone.threshold
+
+			if should_trigger:
 				_try_achieve_milestone(id)
 
 
@@ -375,6 +400,81 @@ func _try_achieve_milestone(id: String) -> void:
 		# Process unlock rewards
 		for unlock in milestone.unlock_rewards:
 			EventBus.building_unlocked.emit(unlock)
+
+# =============================================================================
+# VICTORY MILESTONE TRACKING (Story 6-10)
+# =============================================================================
+
+## Update territory percentage based on current territory count.
+func _update_territory_percentage() -> void:
+	var territory_manager := get_node_or_null("/root/TerritoryManager")
+	if territory_manager == null:
+		# Try to find TerritoryManager in the scene tree
+		var world_manager := get_node_or_null("/root/GameWorld/WorldManager")
+		if world_manager and world_manager.has_node("TerritoryManager"):
+			territory_manager = world_manager.get_node("TerritoryManager")
+
+	if territory_manager and territory_manager.has_method("get_total_hex_count") and territory_manager.has_method("get_claimed_count"):
+		var total: int = territory_manager.get_total_hex_count()
+		var claimed: int = territory_manager.get_claimed_count()
+		if total > 0:
+			_territory_percentage = (float(claimed) / float(total)) * 100.0
+		else:
+			_territory_percentage = 0.0
+	else:
+		# Fallback: estimate from territory count (not percentage)
+		_territory_percentage = 0.0
+
+
+## Check all victory milestones (Story 6-10).
+## Victory milestones track population, territory percentage, and production.
+func _check_victory_milestones() -> void:
+	for id in _milestones:
+		var milestone: MilestoneData = _milestones[id]
+		if milestone.type == MilestoneData.Type.VICTORY:
+			var should_trigger := false
+
+			# Check victory condition based on trigger_value
+			if milestone.trigger_value == "territory_percentage":
+				# Plains Conqueror: 80% territory
+				should_trigger = _territory_percentage >= float(milestone.threshold)
+			elif milestone.trigger_value == "bread":
+				# Master Crafter: First bread produced
+				should_trigger = _first_productions.has("bread")
+			elif milestone.trigger_value == "":
+				# Thriving Village: Population threshold
+				should_trigger = _counts["population"] >= milestone.threshold
+
+			if should_trigger:
+				_try_achieve_milestone(id)
+
+
+## Get victory progress for UI display (Story 6-10 AC8).
+## @param victory_type One of: "population", "territory", "production"
+## @return Dictionary with progress info
+func get_victory_progress(victory_type: String) -> Dictionary:
+	match victory_type:
+		"population":
+			return {
+				"current": _counts["population"],
+				"target": 50,
+				"achieved": is_milestone_achieved("victory_thriving_village"),
+			}
+		"territory":
+			return {
+				"current": int(_territory_percentage),
+				"target": 80,
+				"achieved": is_milestone_achieved("victory_plains_conqueror"),
+			}
+		"production":
+			return {
+				"current": _first_productions.has("bread"),
+				"target": true,
+				"achieved": is_milestone_achieved("victory_master_crafter"),
+			}
+		_:
+			return {}
+
 
 # =============================================================================
 # HELPER FUNCTIONS
