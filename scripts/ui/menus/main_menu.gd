@@ -129,11 +129,15 @@ func _on_new_game_pressed() -> void:
 
 	GameLogger.info("MainMenu", "New Game pressed")
 
-	# Emit new game signal
-	EventBus.new_game_started.emit()
-
-	# Transition to game scene
-	get_tree().change_scene_to_file(GAME_SCENE_PATH)
+	# Use GameManager to properly start new game
+	# This handles scene transition and deferred signal emission
+	if is_instance_valid(GameManager):
+		GameManager.start_new_game()
+	else:
+		# Fallback: direct scene change (signal won't work properly)
+		push_warning("[MainMenu] GameManager not available, using direct scene change")
+		EventBus.new_game_started.emit()
+		get_tree().change_scene_to_file(GAME_SCENE_PATH)
 
 
 ## Handle Settings button press

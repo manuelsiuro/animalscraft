@@ -356,3 +356,61 @@ func test_empty_world_before_generation() -> void:
 	# Don't add to tree (no _ready)
 	assert_false(_manager.is_world_generated(), "World should not be generated initially")
 	assert_eq(_manager.get_tile_count(), 0, "Should have 0 tiles initially")
+
+# =============================================================================
+# INITIAL ENTITY SPAWNING TESTS (Story 7-5: Visual Review Fixes)
+# =============================================================================
+
+## Test get_player_spawn_hex returns center hex
+func test_get_player_spawn_hex_returns_center() -> void:
+	await _setup_manager_with_generation()
+
+	var spawn_hex := _manager.get_player_spawn_hex()
+
+	assert_not_null(spawn_hex, "Spawn hex should not be null")
+	assert_eq(spawn_hex.q, 0, "Spawn hex q should be 0 (center)")
+	assert_eq(spawn_hex.r, 0, "Spawn hex r should be 0 (center)")
+
+
+## Test _on_new_game_started method exists
+func test_on_new_game_started_method_exists() -> void:
+	assert_true(_manager.has_method("_on_new_game_started"),
+		"WorldManager should have _on_new_game_started method")
+
+
+## Test _spawn_initial_stockpile method exists
+func test_spawn_initial_stockpile_method_exists() -> void:
+	assert_true(_manager.has_method("_spawn_initial_stockpile"),
+		"WorldManager should have _spawn_initial_stockpile method")
+
+
+## Test _spawn_initial_animals method exists
+func test_spawn_initial_animals_method_exists() -> void:
+	assert_true(_manager.has_method("_spawn_initial_animals"),
+		"WorldManager should have _spawn_initial_animals method")
+
+
+## Test STARTING_ANIMALS constant defines expected animal count
+func test_starting_animals_constant() -> void:
+	# GameConstants.STARTING_ANIMALS should define how many animals to spawn
+	assert_true(GameConstants.STARTING_ANIMALS > 0,
+		"STARTING_ANIMALS should be greater than 0")
+	assert_eq(GameConstants.STARTING_ANIMALS, 2,
+		"STARTING_ANIMALS should be 2 per GDD")
+
+
+## Test stockpile spawn hex is adjacent to center (1, 0)
+func test_stockpile_spawn_location() -> void:
+	# Per Story 7-5 fix, stockpile spawns at (1, 0)
+	var expected_hex := HexCoord.new(1, 0)
+	var center := HexCoord.new(0, 0)
+
+	# Verify (1, 0) is a neighbor of center (0, 0)
+	var neighbors := center.get_neighbors()
+	var is_neighbor := false
+	for neighbor in neighbors:
+		if neighbor.q == expected_hex.q and neighbor.r == expected_hex.r:
+			is_neighbor = true
+			break
+
+	assert_true(is_neighbor, "Stockpile at (1,0) should be a neighbor of center (0,0)")

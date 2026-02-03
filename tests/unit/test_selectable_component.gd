@@ -172,16 +172,18 @@ func test_position_in_range_ignores_y_coordinate() -> void:
 
 func test_position_in_range_exact_boundary() -> void:
 	mock_entity.global_position = Vector3(0, 0, 0)
-	# Position at exact boundary (radius = 32 / 64 = 0.5 world units)
-	var boundary_pos := Vector3(0.5, 0, 0)
+	# Position at exact boundary (radius = tap_radius = 32 world units)
+	# Story 7-5 Fix: Selection radius now uses tap_radius directly as world units
+	var boundary_pos := Vector3(32.0, 0, 0)
 
 	assert_true(selectable.is_position_in_range(boundary_pos), "Should include boundary position")
 
 
 func test_position_in_range_just_outside_boundary() -> void:
 	mock_entity.global_position = Vector3(0, 0, 0)
-	# Position just beyond boundary
-	var beyond_pos := Vector3(0.6, 0, 0)
+	# Position just beyond boundary (tap_radius = 32 world units)
+	# Story 7-5 Fix: Selection radius now uses tap_radius directly as world units
+	var beyond_pos := Vector3(33.0, 0, 0)
 
 	assert_false(selectable.is_position_in_range(beyond_pos), "Should exclude position beyond boundary")
 

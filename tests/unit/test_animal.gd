@@ -351,3 +351,30 @@ func test_stats_persist_through_animal_lifecycle() -> void:
 
 	# Verify base stats unchanged (read-only pattern)
 	assert_eq(stats_comp.get_base_stats().energy, 3, "Base stats should remain unchanged")
+
+# =============================================================================
+# VISUAL SCALING TESTS (Story 7-5: Visual Review Fixes)
+# =============================================================================
+
+func test_animal_visual_scale_constant_defined() -> void:
+	## Story 7-5: ANIMAL_VISUAL_SCALE constant should be defined
+	assert_true("ANIMAL_VISUAL_SCALE" in Animal, "ANIMAL_VISUAL_SCALE constant should exist")
+
+
+func test_animal_visual_scale_value() -> void:
+	## Story 7-5: Animal visual scale should be 12.0 to match world scale
+	## Animals are modeled at ~1 unit but tiles are HEX_SIZE (64) units
+	assert_eq(Animal.ANIMAL_VISUAL_SCALE, 12.0, "ANIMAL_VISUAL_SCALE should be 12.0")
+
+
+func test_visual_scaled_after_initialize() -> void:
+	## Story 7-5: Visual node should be scaled after initialize()
+	animal.initialize(mock_hex, mock_stats)
+
+	var visual: Node3D = animal.get_node_or_null("Visual")
+	if visual:
+		# Visual should be scaled by ANIMAL_VISUAL_SCALE
+		var expected_scale := Animal.ANIMAL_VISUAL_SCALE
+		assert_almost_eq(visual.scale.x, expected_scale, 0.1, "Visual X scale should match ANIMAL_VISUAL_SCALE")
+		assert_almost_eq(visual.scale.y, expected_scale, 0.1, "Visual Y scale should match ANIMAL_VISUAL_SCALE")
+		assert_almost_eq(visual.scale.z, expected_scale, 0.1, "Visual Z scale should match ANIMAL_VISUAL_SCALE")

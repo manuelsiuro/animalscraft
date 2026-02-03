@@ -17,7 +17,7 @@ extends Node
 # =============================================================================
 
 ## Path to the main menu/title scene
-const MAIN_SCENE_PATH := "res://scenes/main.tscn"
+const MAIN_SCENE_PATH := "res://scenes/ui/menus/main_menu.tscn"
 
 ## Path to the gameplay scene
 const GAME_SCENE_PATH := "res://scenes/game.tscn"
@@ -177,17 +177,24 @@ func start_first_launch_game() -> void:
 func start_new_game() -> void:
 	GameLogger.info("GameManager", "Starting new game")
 
-	_transition_to_state(GameState.LOADING)
-
 	# Reset playtime
 	_session_playtime = 0.0
 	_loaded_playtime = 0.0
 
-	# Initialize game world (to be implemented with world systems)
-	# For now, just transition to playing
-	await get_tree().create_timer(0.5).timeout  # Simulate loading
+	# Load the game scene - this handles state transitions internally
+	change_to_game_scene()
 
-	_transition_to_state(GameState.PLAYING)
+	# Wait for scene to actually be loaded before emitting new_game_started
+	# The scene_loaded signal is emitted after change_scene_to_file completes
+	await EventBus.scene_loaded
+
+	# Wait additional frames for scene's _ready() to complete and nodes to initialize
+	# change_scene_to_file() returns before _ready() runs
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# Now the game scene and WorldManager are ready
+	GameLogger.info("GameManager", "Emitting new_game_started signal")
 	EventBus.new_game_started.emit()
 
 
@@ -196,16 +203,19 @@ func start_new_game() -> void:
 func load_saved_game(slot: int = 0) -> void:
 	GameLogger.info("GameManager", "Loading saved game from slot %d" % slot)
 
-	_transition_to_state(GameState.LOADING)
+	# First load the game scene
+	change_to_game_scene()
 
+	# Wait for scene to be ready
+	await get_tree().process_frame
+
+	# Then load the save data
 	var success := SaveManager.load_game(slot)
 
-	if success:
-		_transition_to_state(GameState.PLAYING)
-	else:
+	if not success:
 		# Return to menu on failed load
 		GameLogger.error("GameManager", "Failed to load game, returning to menu")
-		_transition_to_state(GameState.MENU)
+		change_to_main_scene()
 
 
 ## Continue the most recent save.

@@ -730,3 +730,32 @@ func test_building_spawned_triggers_pathfinding_update() -> void:
 	assert_signal_emitted(EventBus, "building_spawned")
 	var params: Array = get_signal_parameters(EventBus, "building_spawned")
 	assert_eq(params[0], building, "building_spawned should contain the building")
+
+# =============================================================================
+# VISUAL SCALING TESTS (Story 7-5: Visual Review Fixes)
+# =============================================================================
+
+func test_building_visual_scale_constant_defined() -> void:
+	## Story 7-5: BUILDING_VISUAL_SCALE constant should be defined
+	assert_true("BUILDING_VISUAL_SCALE" in Building, "BUILDING_VISUAL_SCALE constant should exist")
+
+
+func test_building_visual_scale_value() -> void:
+	## Story 7-5: Building visual scale should be 40.0 to match world scale
+	## Buildings are modeled at ~1 unit but tiles are HEX_SIZE (64) units
+	## Buildings need larger scale (40.0) than animals (12.0) because some are flat
+	assert_eq(Building.BUILDING_VISUAL_SCALE, 40.0, "BUILDING_VISUAL_SCALE should be 40.0")
+
+
+func test_visual_scaled_after_initialize() -> void:
+	## Story 7-5: Visual node should be scaled after initialize()
+	building = await _create_test_building()
+	building.initialize(mock_hex, mock_data)
+
+	var visual: Node3D = building.get_node_or_null("Visual")
+	if visual:
+		# Visual should be scaled by BUILDING_VISUAL_SCALE
+		var expected_scale := Building.BUILDING_VISUAL_SCALE
+		assert_almost_eq(visual.scale.x, expected_scale, 0.1, "Visual X scale should match BUILDING_VISUAL_SCALE")
+		assert_almost_eq(visual.scale.y, expected_scale, 0.1, "Visual Y scale should match BUILDING_VISUAL_SCALE")
+		assert_almost_eq(visual.scale.z, expected_scale, 0.1, "Visual Z scale should match BUILDING_VISUAL_SCALE")

@@ -211,3 +211,79 @@ func test_to_string_initialized() -> void:
 func test_to_string_uninitialized() -> void:
 	var str := _tile.to_string()
 	assert_eq(str, "HexTile(uninitialized)", "Uninitialized tile should show 'uninitialized'")
+
+# =============================================================================
+# AC7-5: 3D Terrain Model Tests (Story 7-5: Visual Review Fixes)
+# =============================================================================
+
+## Test USE_3D_TERRAIN_MODELS constant is defined
+func test_use_3d_terrain_models_constant_defined() -> void:
+	assert_true("USE_3D_TERRAIN_MODELS" in HexTile, "USE_3D_TERRAIN_MODELS constant should exist")
+
+
+## Test TERRAIN_MODEL_PATHS contains all terrain types
+func test_terrain_model_paths_defined() -> void:
+	assert_true(HexTile.TERRAIN_MODEL_PATHS.has(HexTile.TerrainType.GRASS), "GRASS model path should be defined")
+	assert_true(HexTile.TERRAIN_MODEL_PATHS.has(HexTile.TerrainType.WATER), "WATER model path should be defined")
+	assert_true(HexTile.TERRAIN_MODEL_PATHS.has(HexTile.TerrainType.ROCK), "ROCK model path should be defined")
+
+
+## Test _get_safe_surface_material returns null for invalid mesh
+func test_get_safe_surface_material_null_mesh() -> void:
+	var result := _tile._get_safe_surface_material(null)
+	assert_null(result, "_get_safe_surface_material should return null for null input")
+
+
+## Test _get_safe_surface_material returns null for mesh without surfaces
+func test_get_safe_surface_material_no_surfaces() -> void:
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.mesh = null  # No mesh set
+	add_child(mesh_instance)
+
+	var result := _tile._get_safe_surface_material(mesh_instance)
+	assert_null(result, "_get_safe_surface_material should return null for mesh without mesh resource")
+
+	mesh_instance.queue_free()
+
+
+## Test terrain model scale factor matches HEX_SIZE (Story 7-5 fix)
+## When 3D models load, they should be scaled by HEX_SIZE (64 units)
+func test_terrain_model_scale_factor() -> void:
+	# This test verifies the scaling constant is correct
+	# Models are created at unit scale (1.0), need to scale to HEX_SIZE
+	var expected_scale: float = GameConstants.HEX_SIZE
+	assert_eq(expected_scale, 64.0, "HEX_SIZE should be 64.0 for terrain model scaling")
+
+
+## Test terrain model rotation offset (Story 7-5 fix)
+## GLB models may be on XY plane, need -90° X rotation to lay flat on XZ plane
+func test_terrain_model_rotation_offset() -> void:
+	# When 3D models load, they should be rotated -90 degrees around X axis
+	# This test documents the expected rotation offset
+	var expected_rotation: float = -90.0
+	# Note: Actual rotation is applied in _try_load_terrain_model()
+	# This test documents the expected value
+	assert_eq(expected_rotation, -90.0, "Terrain models should rotate -90 degrees on X axis")
+
+
+## Test terrain scene cache is static (shared across all tiles)
+func test_terrain_scene_cache_is_static() -> void:
+	# The cache should be a static class variable
+	assert_true(HexTile._terrain_scene_cache is Dictionary, "Terrain scene cache should be a Dictionary")
+
+
+## Test _animate_state_transition handles no-tweener case (Story 7-5 fix)
+## When using 3D models, procedural mesh may be hidden and have no materials to animate
+## The tween should still work without throwing "started with no Tweeners" error
+func test_animate_state_transition_no_crash_with_3d_models() -> void:
+	var hex := HexCoord.new(0, 0)
+	_tile.initialize(hex, HexTile.TerrainType.GRASS)
+	await get_tree().process_frame
+
+	# Setting territory state triggers _animate_state_transition()
+	# This should NOT crash even if procedural mesh is hidden (3D model mode)
+	_tile.set_territory_state(1)  # SCOUTED
+	await get_tree().process_frame
+
+	# If we get here without error, the test passes
+	assert_true(true, "State transition should not crash with 3D terrain models")

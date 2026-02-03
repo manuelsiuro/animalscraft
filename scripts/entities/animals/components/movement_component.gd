@@ -419,7 +419,8 @@ func _update_target_rotation(direction: Vector3) -> void:
 
 	# Calculate Y rotation to face direction (X-Z plane movement)
 	# atan2(x, z) gives angle from +Z axis toward +X axis
-	_target_rotation = atan2(direction.x, direction.z)
+	# Add PI (180°) offset because GLB models are exported facing -Z
+	_target_rotation = atan2(direction.x, direction.z) + PI
 
 
 ## Smoothly update facing direction

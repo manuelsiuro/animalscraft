@@ -1,10 +1,10 @@
 ---
 project_name: 'AnimalsCraft'
 user_name: 'Manu'
-date: '2026-01-13'
+date: '2026-02-03'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules']
 status: 'complete'
-rule_count: 45
+rule_count: 52
 optimized_for_llm: true
 ---
 
@@ -106,6 +106,70 @@ var world_pos: Vector3 = ray_origin + ray_direction * t
 - Signal naming: `{noun}_{past_tense_verb}` (e.g., `territory_claimed`)
 - Never directly reference other systems - emit signals instead
 
+#### Entity Visual Scaling (Story 7-5 Visual Review)
+
+**CRITICAL: 3D models are at unit scale (1.0) but hex tiles are HEX_SIZE (64) units.**
+
+| Entity Type | Scale Constant | Value | Notes |
+|-------------|----------------|-------|-------|
+| HexTile Terrain | `GameConstants.HEX_SIZE` | 64.0 | Terrain models scaled to match hex size |
+| Animal | `ANIMAL_VISUAL_SCALE` | 12.0 | In Animal.gd, applied to Visual child |
+| Building | `BUILDING_VISUAL_SCALE` | 40.0 | In Building.gd, larger due to flat models |
+
+**GLB Model Orientation (CRITICAL):**
+```gdscript
+# GLB models are often exported facing -Z, need PI (180°) rotation offset
+# In MovementComponent._update_target_rotation():
+_target_rotation = atan2(direction.x, direction.z) + PI
+
+# Terrain models may be on XY plane, need -90° X rotation to lay flat
+_terrain_model.rotation_degrees.x = -90.0
+```
+
+**Visual Scaling Pattern:**
+```gdscript
+# In Animal.initialize() or Building.initialize():
+if _visual:
+    _visual.scale = Vector3(VISUAL_SCALE, VISUAL_SCALE, VISUAL_SCALE)
+```
+
+#### Selection System (Story 7-5 Visual Review)
+
+**Selection radius uses world units directly (NOT pixels):**
+```gdscript
+# CORRECT: Use tap_radius as world units
+func is_position_in_range(world_pos: Vector3) -> bool:
+    var distance := Vector2(world_pos.x - entity_pos.x, world_pos.z - entity_pos.z).length()
+    return distance <= tap_radius  # tap_radius = 32 world units
+
+# WRONG (old code): Dividing by HEX_SIZE made radius too small
+var world_radius := tap_radius / GameConstants.HEX_SIZE  # 32/64 = 0.5 units (invisible!)
+```
+
+#### Scene Initialization Timing (Story 7-5 Visual Review)
+
+**CRITICAL: Use proper signal timing when spawning entities after scene change.**
+
+```gdscript
+# In GameManager.start_new_game():
+change_to_game_scene()
+
+# Wait for scene to actually load
+await EventBus.scene_loaded
+
+# Wait additional frames for _ready() to complete
+await get_tree().process_frame
+await get_tree().process_frame
+
+# NOW safe to emit new_game_started (WorldManager is ready)
+EventBus.new_game_started.emit()
+```
+
+**Initial Entity Spawn Order:**
+1. Spawn stockpile FIRST at (1, 0)
+2. Mark stockpile hex as occupied IMMEDIATELY after add_child()
+3. THEN spawn animals, checking hex occupancy to avoid overlap
+
 #### Building Component Patterns (Story 4-4)
 
 **GathererComponent vs ProcessorComponent:**
@@ -185,7 +249,7 @@ world_manager.set_script(script_mock)
 #### Test Coverage Requirements
 - All new functionality must have tests
 - Test acceptance criteria from stories
-- Current baseline: 1626 tests passing (verified 2026-01-20)
+- Current baseline: 1656+ tests passing (verified 2026-02-03, +30 from visual review)
 
 #### Test Count Tracking Process (Epic 4 Improvement)
 **CRITICAL:** Always record actual test counts at commit time, not estimates.
@@ -343,4 +407,4 @@ Before starting implementation:
 
 ---
 
-_Last Updated: 2026-01-20_
+_Last Updated: 2026-02-03_

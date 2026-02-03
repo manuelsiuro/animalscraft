@@ -109,7 +109,9 @@ func is_position_in_range(world_pos: Vector3) -> bool:
 	var entity_pos := _entity.global_position
 	# Check XZ distance (ignore Y)
 	var distance := Vector2(world_pos.x - entity_pos.x, world_pos.z - entity_pos.z).length()
-	var world_radius := tap_radius / GameConstants.HEX_SIZE
+	# Use tap_radius directly as world units (scaled for world size)
+	# Animals are scaled ~12x from unit models, so selection radius should be generous
+	var world_radius := tap_radius  # Now uses world units directly
 	return distance <= world_radius
 
 # =============================================================================

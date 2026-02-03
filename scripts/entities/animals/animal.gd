@@ -5,6 +5,7 @@
 ## Architecture: scripts/entities/animals/animal.gd
 ## Story: 2-1-create-animal-entity-structure
 ## Updated: 2-3-implement-animal-selection (visual feedback, selection signals)
+## Updated: 7-3-create-final-animal-art (animation triggering system)
 class_name Animal
 extends Node3D
 
@@ -60,6 +61,25 @@ var is_wild: bool = false
 ## Selection highlight node (created dynamically)
 var _selection_highlight: MeshInstance3D
 
+## Animation player for playing model animations (Story 7-3)
+var _animation_player: AnimationPlayer
+
+# =============================================================================
+# ANIMATION CONSTANTS (Story 7-3)
+# =============================================================================
+
+## Map AI states to animation names
+const STATE_ANIMATIONS := {
+	0: "idle",     # AnimalState.IDLE
+	1: "walk",     # AnimalState.WALKING
+	2: "work",     # AnimalState.WORKING
+	3: "idle",     # AnimalState.RESTING - use idle animation
+	4: "combat",   # AnimalState.COMBAT (future)
+}
+
+## Default animation if state not found
+const DEFAULT_ANIMATION := "idle"
+
 # =============================================================================
 # LIFECYCLE
 # =============================================================================
@@ -67,8 +87,13 @@ var _selection_highlight: MeshInstance3D
 func _ready() -> void:
 	add_to_group("animals")
 	_setup_selection_visual()
+	_setup_animation_player()
 	_setup_components()
 
+
+## Scale factor for animal visuals to match world scale
+## Animals are modeled at ~1 unit but tiles are HEX_SIZE (64) units
+const ANIMAL_VISUAL_SCALE: float = 12.0
 
 ## Initialize animal with hex position and stats.
 ## Must be called after scene instantiation.
@@ -87,6 +112,10 @@ func initialize(hex: HexCoord, animal_stats: AnimalStats) -> void:
 		position = HexGrid.hex_to_world(hex)
 	else:
 		GameLogger.warn("Animal", "Initialized with null hex coordinate")
+
+	# Scale visual to be visible in world (models are ~1 unit, tiles are 64 units)
+	if _visual:
+		_visual.scale = Vector3(ANIMAL_VISUAL_SCALE, ANIMAL_VISUAL_SCALE, ANIMAL_VISUAL_SCALE)
 
 	# Initialize stats component if it exists and has initialize method
 	if _stats_component and _stats_component.has_method("initialize"):
@@ -109,6 +138,10 @@ func _setup_components() -> void:
 	# Connect to selectable component signals (Story 2-3)
 	if _selectable:
 		_selectable.selection_changed.connect(_on_selection_changed)
+
+	# Connect to AI state changes for animation (Story 7-3)
+	if _ai and _ai.has_signal("state_changed"):
+		_ai.state_changed.connect(_on_ai_state_changed)
 
 
 func _setup_selection_visual() -> void:
@@ -141,6 +174,72 @@ func _setup_selection_visual() -> void:
 	_selection_highlight.visible = false
 
 	add_child(_selection_highlight)
+
+
+## Set up animation player reference (Story 7-3)
+## Searches for AnimationPlayer in the Model hierarchy first (GLB embedded),
+## then falls back to direct child search.
+func _setup_animation_player() -> void:
+	# First, search inside the Model node (GLB imports embed AnimationPlayer in the scene)
+	if _visual:
+		var model := _visual.get_node_or_null("Model")
+		if model:
+			_animation_player = _find_animation_player_recursive(model)
+
+	# Fallback: Look for AnimationPlayer as direct child of Animal
+	if not _animation_player:
+		_animation_player = get_node_or_null("AnimationPlayer")
+
+	if _animation_player:
+		GameLogger.debug("Animal", "AnimationPlayer found for %s" % name)
+		# Play idle animation by default
+		_play_animation(DEFAULT_ANIMATION)
+	else:
+		GameLogger.debug("Animal", "No AnimationPlayer found for %s (placeholder mode)" % name)
+
+
+## Recursively search for AnimationPlayer in node hierarchy (Story 7-3)
+## GLB imports can place AnimationPlayer at various depths depending on armature structure.
+func _find_animation_player_recursive(node: Node) -> AnimationPlayer:
+	# Check if this node is an AnimationPlayer
+	if node is AnimationPlayer:
+		return node as AnimationPlayer
+
+	# Check direct children first
+	for child in node.get_children():
+		if child is AnimationPlayer:
+			return child as AnimationPlayer
+
+	# Recursively search deeper (limit depth to avoid excessive searching)
+	for child in node.get_children():
+		var found := _find_animation_player_recursive(child)
+		if found:
+			return found
+
+	return null
+
+
+## Play an animation by name if it exists (Story 7-3)
+func _play_animation(anim_name: String) -> void:
+	if not _animation_player:
+		return
+
+	# Check if animation exists in the player's library
+	if _animation_player.has_animation(anim_name):
+		_animation_player.play(anim_name)
+	elif anim_name != DEFAULT_ANIMATION and _animation_player.has_animation(DEFAULT_ANIMATION):
+		# Fallback to default animation
+		GameLogger.debug("Animal", "%s: Animation '%s' not found, using '%s'" % [name, anim_name, DEFAULT_ANIMATION])
+		_animation_player.play(DEFAULT_ANIMATION)
+	else:
+		# No animation available - log once for debugging
+		GameLogger.debug("Animal", "%s: No animation available for '%s'" % [name, anim_name])
+
+
+## Handle AI state change to trigger appropriate animation (Story 7-3)
+func _on_ai_state_changed(_old_state: int, new_state: int) -> void:
+	var anim_name: String = STATE_ANIMATIONS.get(new_state, DEFAULT_ANIMATION)
+	_play_animation(anim_name)
 
 
 ## Show selection highlight with juice animation
@@ -376,6 +475,10 @@ func cleanup() -> void:
 	# 3. Disconnect signals to prevent orphan connections
 	if _selectable and _selectable.selection_changed.is_connected(_on_selection_changed):
 		_selectable.selection_changed.disconnect(_on_selection_changed)
+
+	# Disconnect AI state changed signal (Story 7-3)
+	if _ai and _ai.has_signal("state_changed") and _ai.state_changed.is_connected(_on_ai_state_changed):
+		_ai.state_changed.disconnect(_on_ai_state_changed)
 
 	# AIComponent handles its own signal cleanup in _exit_tree()
 

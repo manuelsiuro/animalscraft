@@ -47,6 +47,16 @@ const CONTESTED_FADE_DURATION: float = 0.4  # AC4: 0.4s transition when becoming
 const EXPANSION_GLOW_COLOR: Color = Color("#4CAF5040")  # Subtle green glow (25% alpha)
 const EXPANSION_GLOW_PULSE_SPEED: float = 1.5  # Slower than contested for subtlety
 
+## Story 7-5: Terrain 3D model paths (optional - falls back to procedural if not found)
+const TERRAIN_MODEL_PATHS: Dictionary = {
+	TerrainType.GRASS: "res://assets/models/terrain/grass.glb",
+	TerrainType.WATER: "res://assets/models/terrain/water.glb",
+	TerrainType.ROCK: "res://assets/models/terrain/rock.glb",
+}
+
+## Story 7-5: Whether to use 3D terrain models (true) or procedural flat hex (false)
+const USE_3D_TERRAIN_MODELS: bool = true
+
 # =============================================================================
 # PROPERTIES
 # =============================================================================
@@ -88,6 +98,26 @@ static var _global_pulse_time: float = 0.0
 ## Story 5-3: Track if this tile should show expansion glow
 var _has_expansion_glow: bool = false
 
+## Story 7-5: Reference to 3D terrain model instance (if using 3D models)
+var _terrain_model: Node3D = null
+
+## Story 7-5: Cache for loaded terrain scenes
+static var _terrain_scene_cache: Dictionary = {}
+
+
+## Story 7-5: Safely get surface override material from a MeshInstance3D.
+## Returns null if the mesh node is invalid, has no mesh, or has no surfaces.
+## This prevents errors when using 3D terrain models where procedural mesh is hidden.
+##
+## @param mesh_node The MeshInstance3D to get material from
+## @return The StandardMaterial3D or null if not available
+func _get_safe_surface_material(mesh_node: MeshInstance3D) -> StandardMaterial3D:
+	if not mesh_node or not mesh_node.mesh:
+		return null
+	if mesh_node.mesh.get_surface_count() == 0:
+		return null
+	return mesh_node.get_surface_override_material(0) as StandardMaterial3D
+
 # =============================================================================
 # LIFECYCLE
 # =============================================================================
@@ -95,7 +125,8 @@ var _has_expansion_glow: bool = false
 func _ready() -> void:
 	# AR18: Internal setup only - no external dependencies
 	add_to_group("tiles")
-	_setup_hex_mesh()
+	# Note: _setup_hex_mesh() is called from initialize() after terrain_type is set
+	# This ensures correct 3D model is loaded for the actual terrain type
 	_setup_territory_visuals()
 	_setup_contested_overlay()  # Story 5-3
 
@@ -119,7 +150,7 @@ func _process(delta: float) -> void:
 
 	# Apply pulse to border
 	if border_mesh:
-		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		var border_mat := _get_safe_surface_material(border_mesh)
 		if border_mat:
 			border_mat.albedo_color.a = pulse_alpha
 
@@ -143,7 +174,10 @@ func initialize(hex: HexCoord, terrain: TerrainType) -> void:
 	var world_pos := HexGrid.hex_to_world(hex)
 	position = world_pos
 
-	# Update visual with terrain color
+	# Setup hex mesh AFTER terrain_type is set (ensures correct 3D model is loaded)
+	_setup_hex_mesh()
+
+	# Update visual with terrain color (for procedural fallback)
 	_update_visual()
 
 # =============================================================================
@@ -152,11 +186,20 @@ func initialize(hex: HexCoord, terrain: TerrainType) -> void:
 
 ## Setup hex mesh with correct pointy-top vertices using HEX_SIZE.
 ## AC5: Dynamically generates 3D mesh based on GameConstants.HEX_SIZE
+## Story 7-5: Updated to optionally use 3D terrain models
 func _setup_hex_mesh() -> void:
 	if not mesh_instance:
 		return
 
-	# Create hexagonal mesh for terrain
+	# Story 7-5: Try to load 3D terrain model first (if enabled)
+	if USE_3D_TERRAIN_MODELS:
+		var model_loaded := _try_load_terrain_model(terrain_type)
+		if model_loaded:
+			# Hide procedural mesh, show 3D model
+			mesh_instance.visible = false
+			return
+
+	# Fallback: Create procedural hexagonal mesh for terrain
 	var hex_mesh := _create_hexagonal_mesh(GameConstants.HEX_SIZE)
 	mesh_instance.mesh = hex_mesh
 
@@ -246,13 +289,71 @@ func _create_hexagonal_mesh(size: float) -> ArrayMesh:
 	return array_mesh
 
 
+## Story 7-5: Try to load and instantiate a 3D terrain model.
+## Uses static cache to avoid reloading the same scene multiple times.
+##
+## @param terrain The terrain type to load model for
+## @return True if model loaded successfully, false to use procedural fallback
+func _try_load_terrain_model(terrain: TerrainType) -> bool:
+	# Check if model path exists for this terrain type
+	if not TERRAIN_MODEL_PATHS.has(terrain):
+		return false
+
+	var model_path: String = TERRAIN_MODEL_PATHS[terrain]
+
+	# Check file existence before loading
+	if not ResourceLoader.exists(model_path):
+		if is_instance_valid(GameLogger):
+			GameLogger.debug("HexTile", "Terrain model not found: %s, using procedural fallback" % model_path)
+		return false
+
+	# Load from cache or load fresh
+	var scene: PackedScene
+	if _terrain_scene_cache.has(terrain):
+		scene = _terrain_scene_cache[terrain]
+	else:
+		scene = load(model_path)
+		if not scene:
+			if is_instance_valid(GameLogger):
+				GameLogger.warning("HexTile", "Failed to load terrain model: %s" % model_path)
+			return false
+		_terrain_scene_cache[terrain] = scene
+
+	# Instantiate the model
+	_terrain_model = scene.instantiate()
+	if not _terrain_model:
+		if is_instance_valid(GameLogger):
+			GameLogger.warning("HexTile", "Failed to instantiate terrain model: %s" % model_path)
+		return false
+
+	# Add model as child and position at terrain level
+	add_child(_terrain_model)
+	_terrain_model.name = "TerrainModel"
+	_terrain_model.position = Vector3.ZERO  # Model sits at tile origin
+
+	# Story 7-5: Scale model to match HEX_SIZE
+	# Models are created at unit scale (1.0), need to scale to HEX_SIZE
+	var scale_factor: float = GameConstants.HEX_SIZE
+	_terrain_model.scale = Vector3(scale_factor, scale_factor, scale_factor)
+
+	# Story 7-5: Rotate model to correct orientation
+	# GLB models may be created on XY plane, need to rotate to XZ plane (Y-up)
+	# Rotate -90 degrees around X axis to lay flat
+	_terrain_model.rotation_degrees.x = -90.0
+
+	if is_instance_valid(GameLogger):
+		GameLogger.debug("HexTile", "Loaded 3D terrain model: %s for %s (scale: %.1f)" % [model_path, TerrainType.keys()[terrain], scale_factor])
+
+	return true
+
+
 ## Update the visual appearance based on terrain type
 func _update_visual() -> void:
 	if not mesh_instance:
 		return
 
 	var color: Color = TERRAIN_COLORS.get(terrain_type, TERRAIN_COLORS[TerrainType.GRASS])
-	var material := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+	var material := _get_safe_surface_material(mesh_instance)
 	if material:
 		material.albedo_color = color
 
@@ -308,6 +409,7 @@ func cleanup() -> void:
 	border_mesh = null
 	fog_mesh = null
 	_contested_overlay = null  # Story 5-3
+	_terrain_model = null  # Story 7-5
 
 	# 5. Remove from groups
 	if is_in_group("tiles"):
@@ -334,7 +436,7 @@ func _setup_territory_visuals() -> void:
 		return
 
 	# Border is initially transparent (no state)
-	var border_material := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+	var border_material := _get_safe_surface_material(border_mesh)
 	if border_material:
 		border_material.albedo_color = Color.TRANSPARENT
 
@@ -372,48 +474,49 @@ func _apply_initial_visual_state() -> void:
 	match territory_state:
 		0:  # UNEXPLORED
 			fog_mesh.visible = true
-			var fog_mat := fog_mesh.get_surface_override_material(0) as StandardMaterial3D
+			var fog_mat := _get_safe_surface_material(fog_mesh)
 			if fog_mat:
 				fog_mat.albedo_color.a = FOG_OPACITY
-			var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+			var border_mat := _get_safe_surface_material(border_mesh)
 			if border_mat:
 				border_mat.albedo_color.a = 0.0
 		1:  # SCOUTED
 			fog_mesh.visible = false
 			var desaturated_color := _desaturate_color(_get_terrain_color(terrain_type), SCOUTED_SATURATION)
-			var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+			var mesh_mat := _get_safe_surface_material(mesh_instance)
 			if mesh_mat:
 				mesh_mat.albedo_color = desaturated_color
-			var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+			var border_mat := _get_safe_surface_material(border_mesh)
 			if border_mat:
 				border_mat.albedo_color.a = 0.0
 		2:  # CONTESTED
 			fog_mesh.visible = false
-			var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+			var mesh_mat := _get_safe_surface_material(mesh_instance)
 			if mesh_mat:
 				mesh_mat.albedo_color = _get_terrain_color(terrain_type)
-			var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+			var border_mat := _get_safe_surface_material(border_mesh)
 			if border_mat:
 				border_mat.albedo_color = COLOR_CONTESTED
 		3:  # CLAIMED
 			fog_mesh.visible = false
-			var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+			var mesh_mat := _get_safe_surface_material(mesh_instance)
 			if mesh_mat:
 				mesh_mat.albedo_color = _get_terrain_color(terrain_type)
-			var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+			var border_mat := _get_safe_surface_material(border_mesh)
 			if border_mat:
 				border_mat.albedo_color = COLOR_CLAIMED
 		4:  # NEGLECTED
 			fog_mesh.visible = false
-			var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+			var mesh_mat := _get_safe_surface_material(mesh_instance)
 			if mesh_mat:
 				mesh_mat.albedo_color = _get_terrain_color(terrain_type)
-			var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+			var border_mat := _get_safe_surface_material(border_mesh)
 			if border_mat:
 				border_mat.albedo_color = COLOR_NEGLECTED
 
 ## Animate the visual transition to the current territory state.
 ## Uses Tween for smooth color/opacity changes.
+## Story 7-5: Added safety for when using 3D terrain models (no procedural mesh materials)
 func _animate_state_transition() -> void:
 	# Cancel any existing tween
 	if _tween and _tween.is_running():
@@ -421,6 +524,10 @@ func _animate_state_transition() -> void:
 
 	_tween = create_tween()
 	_tween.set_parallel(true)  # Multiple properties animate simultaneously
+
+	# Story 7-5: Add a minimal callback to ensure tween has at least one operation
+	# This prevents "started with no Tweeners" errors when using 3D terrain models
+	_tween.tween_callback(func(): pass).set_delay(0.0)
 
 	match territory_state:
 		0:  # UNEXPLORED
@@ -443,7 +550,7 @@ func _apply_unexplored_state(tween: Tween) -> void:
 	# Dark fog overlay
 	if fog_mesh:
 		fog_mesh.visible = true
-		var fog_mat := fog_mesh.get_surface_override_material(0) as StandardMaterial3D
+		var fog_mat := _get_safe_surface_material(fog_mesh)
 		if fog_mat:
 			tween.tween_property(fog_mat, "albedo_color:a", FOG_OPACITY, STATE_TRANSITION_DURATION)
 		# AC1: Start subtle fog animation (pulsing opacity)
@@ -451,7 +558,7 @@ func _apply_unexplored_state(tween: Tween) -> void:
 
 	# No border
 	if border_mesh:
-		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		var border_mat := _get_safe_surface_material(border_mesh)
 		if border_mat:
 			tween.tween_property(border_mat, "albedo_color:a", 0.0, STATE_TRANSITION_DURATION)
 
@@ -466,7 +573,7 @@ func _apply_scouted_state(tween: Tween) -> void:
 
 	# Fade out fog
 	if fog_mesh:
-		var fog_mat := fog_mesh.get_surface_override_material(0) as StandardMaterial3D
+		var fog_mat := _get_safe_surface_material(fog_mesh)
 		if fog_mat:
 			tween.tween_property(fog_mat, "albedo_color:a", 0.0, STATE_TRANSITION_DURATION)
 		tween.tween_callback(func(): if fog_mesh: fog_mesh.visible = false).set_delay(STATE_TRANSITION_DURATION)
@@ -474,13 +581,13 @@ func _apply_scouted_state(tween: Tween) -> void:
 	# Desaturate terrain
 	var desaturated_color := _desaturate_color(_get_terrain_color(terrain_type), SCOUTED_SATURATION)
 	if mesh_instance:
-		var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+		var mesh_mat := _get_safe_surface_material(mesh_instance)
 		if mesh_mat:
 			tween.tween_property(mesh_mat, "albedo_color", desaturated_color, STATE_TRANSITION_DURATION)
 
 	# No border
 	if border_mesh:
-		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		var border_mat := _get_safe_surface_material(border_mesh)
 		if border_mat:
 			tween.tween_property(border_mat, "albedo_color:a", 0.0, STATE_TRANSITION_DURATION)
 
@@ -497,13 +604,13 @@ func _apply_contested_state(tween: Tween) -> void:
 	# Full saturation terrain
 	var full_color := _get_terrain_color(terrain_type)
 	if mesh_instance:
-		var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+		var mesh_mat := _get_safe_surface_material(mesh_instance)
 		if mesh_mat:
 			tween.tween_property(mesh_mat, "albedo_color", full_color, STATE_TRANSITION_DURATION)
 
 	# Red border (initial color, pulse will animate alpha)
 	if border_mesh:
-		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		var border_mat := _get_safe_surface_material(border_mesh)
 		if border_mat:
 			tween.tween_property(border_mat, "albedo_color", COLOR_CONTESTED, STATE_TRANSITION_DURATION)
 
@@ -529,13 +636,13 @@ func _apply_claimed_state(tween: Tween) -> void:
 	# Full saturation terrain
 	var full_color := _get_terrain_color(terrain_type)
 	if mesh_instance:
-		var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+		var mesh_mat := _get_safe_surface_material(mesh_instance)
 		if mesh_mat:
 			tween.tween_property(mesh_mat, "albedo_color", full_color, STATE_TRANSITION_DURATION)
 
 	# Player color border
 	if border_mesh:
-		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		var border_mat := _get_safe_surface_material(border_mesh)
 		if border_mat:
 			tween.tween_property(border_mat, "albedo_color", COLOR_CLAIMED, STATE_TRANSITION_DURATION)
 
@@ -551,13 +658,13 @@ func _apply_neglected_state(tween: Tween) -> void:
 	# Terrain stays full saturation
 	var full_color := _get_terrain_color(terrain_type)
 	if mesh_instance:
-		var mesh_mat := mesh_instance.get_surface_override_material(0) as StandardMaterial3D
+		var mesh_mat := _get_safe_surface_material(mesh_instance)
 		if mesh_mat:
 			tween.tween_property(mesh_mat, "albedo_color", full_color, STATE_TRANSITION_DURATION)
 
 	# Border fades to gray
 	if border_mesh:
-		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		var border_mat := _get_safe_surface_material(border_mesh)
 		if border_mat:
 			tween.tween_property(border_mat, "albedo_color", COLOR_NEGLECTED, STATE_TRANSITION_DURATION)
 
@@ -589,7 +696,7 @@ func _start_fog_animation() -> void:
 	# Stop any existing fog animation
 	_stop_fog_animation()
 
-	var fog_mat := fog_mesh.get_surface_override_material(0) as StandardMaterial3D
+	var fog_mat := _get_safe_surface_material(fog_mesh)
 	if not fog_mat:
 		return
 
@@ -679,7 +786,7 @@ func stop_contested_pulse() -> void:
 
 	# Reset border to static contested color
 	if border_mesh:
-		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		var border_mat := _get_safe_surface_material(border_mesh)
 		if border_mat:
 			border_mat.albedo_color = COLOR_CONTESTED
 
@@ -694,7 +801,7 @@ func set_contested_overlay(enabled: bool, animate: bool = true) -> void:
 	if not _contested_overlay:
 		return
 
-	var overlay_mat := _contested_overlay.get_surface_override_material(0) as StandardMaterial3D
+	var overlay_mat := _get_safe_surface_material(_contested_overlay)
 	if not overlay_mat:
 		return
 
@@ -723,7 +830,7 @@ func set_expansion_glow(enabled: bool) -> void:
 
 	# Apply subtle green glow to border
 	if border_mesh:
-		var border_mat := border_mesh.get_surface_override_material(0) as StandardMaterial3D
+		var border_mat := _get_safe_surface_material(border_mesh)
 		if border_mat:
 			if enabled and territory_state == 3:  # CLAIMED
 				# Add subtle glow by increasing emission

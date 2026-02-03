@@ -496,3 +496,40 @@ func test_speed_with_sad_mood() -> void:
 	# effective = 3 * 0.7 = 2.1
 	# speed = 50 + (2.1 - 1) * 20 = 72
 	assert_almost_eq(speed, 72.0, 0.1, "Sad mood should significantly reduce speed")
+
+
+# =============================================================================
+# ROTATION OFFSET TESTS (Story 7-5: GLB Model Facing Direction Fix)
+# =============================================================================
+
+## Test that _update_target_rotation applies PI offset for GLB models facing -Z
+## Story 7-5: GLB models are exported facing -Z, so PI (180°) offset is needed
+func test_rotation_includes_pi_offset_for_positive_z_direction() -> void:
+	# When moving in +Z direction (away from camera), target rotation should be PI
+	# Formula: atan2(0, 1) + PI = 0 + PI = PI
+	# Access internal state for verification
+	movement._update_target_rotation(Vector3(0, 0, 1))
+
+	assert_almost_eq(movement._target_rotation, PI, 0.01,
+		"Moving +Z should have target rotation = PI (model faces forward)")
+
+
+func test_rotation_includes_pi_offset_for_negative_z_direction() -> void:
+	# When moving in -Z direction (toward camera), target rotation should be 0 (or 2*PI)
+	# Formula: atan2(0, -1) + PI = PI + PI = 2*PI ≈ 0 (normalized)
+	movement._update_target_rotation(Vector3(0, 0, -1))
+
+	# Result wraps to 0 or 2*PI, check if close to 0 or 2*PI
+	var is_near_zero_or_tau: bool = absf(movement._target_rotation) < 0.01 or absf(movement._target_rotation - TAU) < 0.01
+	assert_true(is_near_zero_or_tau,
+		"Moving -Z should have target rotation = 0 or 2*PI")
+
+
+func test_rotation_includes_pi_offset_for_positive_x_direction() -> void:
+	# When moving in +X direction (right), target rotation should be PI/2 + PI = 3*PI/2
+	# Formula: atan2(1, 0) + PI = PI/2 + PI = 3*PI/2
+	movement._update_target_rotation(Vector3(1, 0, 0))
+
+	var expected: float = PI / 2.0 + PI  # 3*PI/2 = 4.712...
+	assert_almost_eq(movement._target_rotation, expected, 0.01,
+		"Moving +X should have target rotation = 3*PI/2")

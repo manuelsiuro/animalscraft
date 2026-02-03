@@ -431,3 +431,41 @@ func test_main_menu_error_dialog_exists() -> void:
 	# Cleanup
 	menu.queue_free()
 	await wait_frames(1)
+
+# =============================================================================
+# NEW GAME BUTTON TESTS (Story 7-5: Visual Review Fixes)
+# =============================================================================
+
+func test_main_menu_new_game_button_exists() -> void:
+	## Story 7-5: Main menu should have a New Game button
+	# Act
+	var menu := _main_menu_scene.instantiate()
+	add_child(menu)
+	await wait_frames(1)
+
+	# Assert
+	var new_game_btn: Button = menu.get_node("VBoxContainer/NewGameButton")
+	assert_not_null(new_game_btn, "New Game button should exist")
+
+	# Cleanup
+	menu.queue_free()
+	await wait_frames(1)
+
+
+func test_gamemanager_start_new_game_method_exists() -> void:
+	## Story 7-5: GameManager should have start_new_game() method
+	## This is the method main menu calls instead of direct scene change
+	assert_true(GameManager.has_method("start_new_game"),
+		"GameManager should have start_new_game() method for main menu to call")
+
+
+func test_gamemanager_change_to_game_scene_method_exists() -> void:
+	## Story 7-5: GameManager should have change_to_game_scene() method
+	assert_true(GameManager.has_method("change_to_game_scene"),
+		"GameManager should have change_to_game_scene() method")
+
+
+func test_gamemanager_game_scene_path_constant() -> void:
+	## Story 7-5: GameManager should define GAME_SCENE_PATH constant
+	assert_eq(GameManager.GAME_SCENE_PATH, "res://scenes/game.tscn",
+		"GameManager.GAME_SCENE_PATH should be res://scenes/game.tscn")

@@ -7,6 +7,11 @@
 class_name Building
 extends Node3D
 
+## Scale factor for building visuals to match world scale
+## Buildings are modeled at ~1 unit but tiles are HEX_SIZE (64) units
+## Note: Some buildings are very flat (~0.06 height), so need larger scale
+const BUILDING_VISUAL_SCALE: float = 40.0
+
 # =============================================================================
 # SIGNALS
 # =============================================================================
@@ -91,6 +96,10 @@ func initialize(hex: HexCoord, building_data: BuildingData) -> void:
 		position = HexGrid.hex_to_world(hex)
 	else:
 		GameLogger.warn("Building", "Initialized with null hex coordinate")
+
+	# Scale visual to be visible in world (models are ~1 unit, tiles are 64 units)
+	if _visual:
+		_visual.scale = Vector3(BUILDING_VISUAL_SCALE, BUILDING_VISUAL_SCALE, BUILDING_VISUAL_SCALE)
 
 	# Initialize worker slots if it exists and has initialize method
 	if _worker_slots and _worker_slots.has_method("initialize"):

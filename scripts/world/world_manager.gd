@@ -110,6 +110,16 @@ func _ready() -> void:
 	add_child(_shelter_seeking_system)
 	# Note: ShelterSeekingSystem self-initializes in _ready() via EventBus connections
 
+	# Connect to new_game_started to spawn initial animals
+	if is_instance_valid(EventBus):
+		EventBus.new_game_started.connect(_on_new_game_started)
+
+
+## Cleanup signal connections when removed from tree.
+func _exit_tree() -> void:
+	if is_instance_valid(EventBus) and EventBus.new_game_started.is_connected(_on_new_game_started):
+		EventBus.new_game_started.disconnect(_on_new_game_started)
+
 
 # =============================================================================
 # WORLD GENERATION
@@ -295,6 +305,116 @@ func get_combat_manager() -> CombatManager:
 ## @return The ShelterSeekingSystem instance
 func get_shelter_seeking_system() -> ShelterSeekingSystem:
 	return _shelter_seeking_system
+
+
+## Handle new game started signal - spawn initial animals and buildings.
+## Creates STARTING_ANIMALS (2) animals at the center hex.
+func _on_new_game_started() -> void:
+	if is_instance_valid(GameLogger):
+		GameLogger.info("WorldManager", "New game started - spawning initial entities")
+
+	# Spawn initial stockpile building FIRST (so animals can check for occupied hexes)
+	_spawn_initial_stockpile()
+
+	# Spawn initial player animals (will avoid occupied hexes)
+	_spawn_initial_animals()
+
+
+## Spawn the initial player animals at the start of a new game.
+## Uses STARTING_ANIMALS constant from GameConstants (default: 2).
+## Spreads animals across adjacent hexes to avoid overlapping and buildings.
+func _spawn_initial_animals() -> void:
+	var center_hex := get_player_spawn_hex()
+	var animal_count: int = GameConstants.STARTING_ANIMALS if is_instance_valid(GameConstants) else 2
+
+	# Get available animal types and pick random ones for variety
+	var available_types := AnimalFactory.get_available_types()
+	if available_types.is_empty():
+		push_error("[WorldManager] No animal types available in AnimalFactory")
+		return
+
+	# Get valid spawn hexes (grass tiles, not occupied by buildings)
+	var spawn_hexes: Array[HexCoord] = []
+
+	# Check center hex first
+	if not HexGrid.is_hex_occupied(center_hex.to_vector()):
+		spawn_hexes.append(center_hex)
+
+	# Then check neighbors
+	var neighbors := center_hex.get_neighbors()
+	for neighbor in neighbors:
+		var tile := get_tile_at(neighbor)
+		# Only use grass tiles that are not occupied by buildings
+		if tile and tile.terrain_type == HexTile.TerrainType.GRASS:
+			if not HexGrid.is_hex_occupied(neighbor.to_vector()):
+				spawn_hexes.append(neighbor)
+				if spawn_hexes.size() >= animal_count:
+					break
+
+	for i in range(animal_count):
+		# Pick a random animal type for variety (rabbits and squirrels are common starters)
+		var animal_type: String
+		if i == 0:
+			animal_type = "rabbit" if "rabbit" in available_types else available_types[0]
+		else:
+			animal_type = "squirrel" if "squirrel" in available_types else available_types[randi() % available_types.size()]
+
+		# Use different hex for each animal - MUST NOT be occupied by a building
+		var spawn_hex: HexCoord = null
+		if i < spawn_hexes.size():
+			spawn_hex = spawn_hexes[i]
+		else:
+			# Fallback: find any valid unoccupied grass hex
+			for hex in spawn_hexes:
+				if not HexGrid.is_hex_occupied(hex.to_vector()):
+					spawn_hex = hex
+					break
+			if not spawn_hex:
+				spawn_hex = center_hex
+
+		# Final safety check - NEVER spawn on occupied hex
+		if HexGrid.is_hex_occupied(spawn_hex.to_vector()):
+			GameLogger.warn("WorldManager", "Spawn hex %s is occupied, finding alternative" % spawn_hex)
+			# Find alternative from neighbors
+			for neighbor in spawn_hex.get_neighbors():
+				var tile := get_tile_at(neighbor)
+				if tile and tile.terrain_type == HexTile.TerrainType.GRASS:
+					if not HexGrid.is_hex_occupied(neighbor.to_vector()):
+						spawn_hex = neighbor
+						break
+
+		var animal := AnimalFactory.create_animal(animal_type, spawn_hex)
+		if animal:
+			# Add animal to the world
+			add_child(animal)
+			if is_instance_valid(GameLogger):
+				GameLogger.info("WorldManager", "Spawned starting animal: %s at %s" % [animal_type, spawn_hex])
+		else:
+			push_warning("[WorldManager] Failed to create starting animal: %s" % animal_type)
+
+
+## Spawn the initial stockpile building at game start.
+## Places a stockpile at (1, 0) adjacent to the home hex.
+func _spawn_initial_stockpile() -> void:
+	var stockpile_hex := HexCoord.new(1, 0)
+
+	# Check if BuildingFactory exists and has stockpile
+	if not BuildingFactory.has_building_type("stockpile"):
+		if is_instance_valid(GameLogger):
+			GameLogger.warn("WorldManager", "Stockpile building type not available")
+		return
+
+	# Create building first (BuildingFactory checks if hex is free)
+	var building := BuildingFactory.create_building("stockpile", stockpile_hex)
+	if building:
+		add_child(building)
+		# Manually mark hex as occupied NOW (don't wait for deferred initialize)
+		# This ensures animals spawned after won't use this hex
+		HexGrid.mark_hex_occupied(stockpile_hex.to_vector(), building)
+		if is_instance_valid(GameLogger):
+			GameLogger.info("WorldManager", "Spawned starting stockpile at %s" % stockpile_hex)
+	else:
+		push_warning("[WorldManager] Failed to create starting stockpile")
 
 
 ## Get the player's spawn hex for recruited animals (Story 5-8).
